@@ -7,6 +7,8 @@ TODO: добавить аутентификацию и авторизацию:
 - зависимости FastAPI Depends(get_current_user), проверка прав на эндпоинты
 """
 
+# запуск python -m uvicorn elevator_control.main:app --reload
+
 from __future__ import annotations
 
 import asyncio
