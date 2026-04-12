@@ -16,14 +16,16 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from elevator_control.adapters.inbound.api.v1 import api_v1_router
 from elevator_control.adapters.outbound.persistence import repositories_impl as impl
 from elevator_control.application.simulation import run_sensor_simulation_tick
 from elevator_control.domain.exceptions import ConflictError, NotFoundError
 from elevator_control.infrastructure.config import settings
-from elevator_control.infrastructure.database import AsyncSessionLocal
+from elevator_control.infrastructure.database import AsyncSessionLocal, engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +54,15 @@ async def _simulation_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("БД (asyncpg): проверка подключения успешна")
+    except Exception:
+        logger.exception(
+            "БД: подключение не удалось. Проверьте DATABASE_URL в .env "
+            "(для API нужен рабочий PostgreSQL; строка postgresql+psycopg:// преобразуется в asyncpg)."
+        )
     task = asyncio.create_task(_simulation_loop())
     yield
     task.cancel()
@@ -59,12 +70,23 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
+    await engine.dispose()
 
 
 app = FastAPI(
     title="Elevator Control API",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+# CORS: без этого браузер с другого порта (React/Vue), file:// или другой хост даёт «Failed to fetch».
+# allow_credentials=True несовместим с allow_origins=["*"] по спецификации CORS.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -78,9 +100,9 @@ async def conflict_handler(_request: Request, exc: ConflictError) -> JSONRespons
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+# @app.get("/health")
+# async def health() -> dict[str, str]:
+#     return {"status": "ok"}
 
 
 app.include_router(api_v1_router, prefix="/api/v1")

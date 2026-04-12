@@ -20,6 +20,17 @@ def _to_read(lift: e.Lift) -> schemas.LiftRead:
     )
 
 
+def _sensor_to_read(s: e.Sensor) -> schemas.SensorRead:
+    assert s.id is not None
+    return schemas.SensorRead(
+        id=s.id,
+        lift_id=s.lift_id,
+        sensor_type=s.sensor_type,
+        current_value=s.current_value,
+        threshold_norm=s.threshold_norm,
+    )
+
+
 @router.get("", response_model=schemas.Paginated)
 async def list_lifts(
     svc: LiftSvcDep,
@@ -64,6 +75,32 @@ async def patch_lift(svc: LiftSvcDep, lift_id: int, body: schemas.LiftUpdate) ->
 @router.delete("/{lift_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lift(svc: LiftSvcDep, lift_id: int) -> None:
     await svc.delete(lift_id)
+
+
+@router.post(
+    "/{lift_id}/restore-state",
+    response_model=schemas.LiftRestoreStateResponse,
+    summary="Восстановить состояние лифта и датчиков",
+    description=(
+        "Сбрасывает аварию (is_emergency=false), выставляет целевой статус лифта (по умолчанию active), "
+        "опционально приводит показания всех датчиков лифта в безопасную зону ниже порога."
+    ),
+)
+async def restore_lift_state(
+    svc: LiftSvcDep,
+    lift_id: int,
+    body: schemas.LiftRestoreStateRequest | None = None,
+) -> schemas.LiftRestoreStateResponse:
+    payload = body or schemas.LiftRestoreStateRequest()
+    lift, sensors = await svc.restore_operational_state(
+        lift_id,
+        target_status=payload.target_status,
+        reset_sensors=payload.reset_sensors,
+    )
+    return schemas.LiftRestoreStateResponse(
+        lift=_to_read(lift),
+        sensors=[_sensor_to_read(s) for s in sensors],
+    )
 
 
 @router.post(

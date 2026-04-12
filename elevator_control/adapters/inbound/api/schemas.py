@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from elevator_control.domain.enums import (
     EventStatus,
@@ -35,6 +35,19 @@ class LiftRead(BaseModel):
     is_emergency: bool
 
 
+class LiftRestoreStateRequest(BaseModel):
+    """Параметры восстановления лифта (все поля необязательны)."""
+
+    target_status: LiftStatus = Field(
+        default=LiftStatus.ACTIVE,
+        description="Статус лифта после восстановления (по умолчанию active)",
+    )
+    reset_sensors: bool = Field(
+        default=True,
+        description="Сбросить показания всех датчиков лифта в безопасную зону (ниже порога)",
+    )
+
+
 class SensorCreate(BaseModel):
     sensor_type: str = Field(..., max_length=64)
     current_value: float = 0.0
@@ -55,6 +68,11 @@ class SensorRead(BaseModel):
     sensor_type: str
     current_value: float
     threshold_norm: float
+
+
+class LiftRestoreStateResponse(BaseModel):
+    lift: LiftRead
+    sensors: list[SensorRead]
 
 
 class EventCreate(BaseModel):
@@ -154,9 +172,20 @@ class EmergencyDemoRequest(BaseModel):
 
     sensor_id: int | None = Field(
         default=None,
-        description="Если не указан — берётся первый датчик лифта по id",
+        description=(
+            "Id существующего датчика этого лифта (≥1). Не указывайте поле или передайте null — "
+            "тогда возьмётся первый датчик лифта. Значение 0 недопустимо (в БД нет id=0)."
+        ),
     )
     note: str | None = Field(default=None, max_length=512, description="Доп. текст в описание инцидента")
+
+    @field_validator("sensor_id", mode="before")
+    @classmethod
+    def sensor_id_zero_means_auto(cls, v: object) -> object:
+        """Swagger часто подставляет 0 — обрабатываем как «датчик не выбран»."""
+        if v == 0:
+            return None
+        return v
 
 
 class EmergencyDemoResponse(BaseModel):

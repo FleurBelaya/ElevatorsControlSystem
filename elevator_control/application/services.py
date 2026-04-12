@@ -50,6 +50,47 @@ class LiftApplicationService:
         if not await self._lifts.delete(lift_id):
             raise NotFoundError("Лифт не найден")
 
+    async def restore_operational_state(
+        self,
+        lift_id: int,
+        *,
+        target_status: LiftStatus = LiftStatus.ACTIVE,
+        reset_sensors: bool = True,
+    ) -> tuple[e.Lift, list[e.Sensor]]:
+        """
+        Восстановление после сценария аварии/остановки: нормальный статус лифта, сброс аварии,
+        при необходимости — показания датчиков в безопасную зону (ниже порога).
+        """
+        current = await self._lifts.get_by_id(lift_id)
+        if current is None:
+            raise NotFoundError("Лифт не найден")
+        restored_lift = await self._lifts.update(
+            e.Lift(
+                id=current.id,
+                model=current.model,
+                status=target_status,
+                location=current.location,
+                is_emergency=False,
+            )
+        )
+        assert restored_lift is not None
+        if reset_sensors:
+            for s in await self._sensors.list_by_lift(lift_id):
+                assert s.id is not None
+                thr = max(s.threshold_norm, 1e-9)
+                safe_value = min(thr * 0.45, max(0.0, thr - 1e-6))
+                await self._sensors.update(
+                    e.Sensor(
+                        id=s.id,
+                        lift_id=s.lift_id,
+                        sensor_type=s.sensor_type,
+                        current_value=safe_value,
+                        threshold_norm=s.threshold_norm,
+                    )
+                )
+        all_sensors = await self._sensors.list_by_lift(lift_id)
+        return restored_lift, all_sensors
+
 
 class SensorApplicationService:
     def __init__(self, lifts: r.LiftRepository, sensors: r.SensorRepository) -> None:
