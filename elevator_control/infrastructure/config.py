@@ -10,10 +10,26 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Подключение к PostgreSQL. Впишите свои USER, PASSWORD, хост и имя БД в .env
+    # Для Alembic и синхронных утилит: postgresql+psycopg://...
+    # Рантайм API использует asyncpg (см. database_url_async).
     database_url: str = "postgresql+psycopg://user:password@localhost:5432/elevator_control"
 
     simulation_interval_seconds: float = 4.0
+
+    @property
+    def database_url_async(self) -> str:
+        """URL для SQLAlchemy AsyncEngine (драйвер asyncpg)."""
+        url = self.database_url.strip()
+        if "+asyncpg" in url:
+            return url
+        if url.startswith("postgresql+psycopg://"):
+            return url.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + url.removeprefix("postgresql://")
+        raise ValueError(
+            "database_url должен начинаться с postgresql+psycopg:// или postgresql:// "
+            "(для миграций); для приложения он будет преобразован в asyncpg."
+        )
 
 
 settings = Settings()

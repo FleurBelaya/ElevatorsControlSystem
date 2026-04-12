@@ -20,7 +20,7 @@ def _to_read(ev: e.Event) -> schemas.EventRead:
 
 
 @router.get("", response_model=schemas.Paginated)
-def list_events(
+async def list_events(
     svc: EventSvcDep,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -28,7 +28,7 @@ def list_events(
     status_filter: EventStatus | None = Query(None, alias="status"),
     event_type: EventType | None = None,
 ) -> schemas.Paginated:
-    items, total = svc.list_page(skip, limit, lift_id, status_filter, event_type)
+    items, total = await svc.list_page(skip, limit, lift_id, status_filter, event_type)
     return schemas.Paginated(
         items=[_to_read(x).model_dump() for x in items],
         total=total,
@@ -38,8 +38,8 @@ def list_events(
 
 
 @router.post("", response_model=schemas.EventRead, status_code=status.HTTP_201_CREATED)
-def create_event(svc: EventSvcDep, body: schemas.EventCreate) -> schemas.EventRead:
-    created = svc.create(
+async def create_event(svc: EventSvcDep, body: schemas.EventCreate) -> schemas.EventRead:
+    created = await svc.create(
         e.Event(
             id=None,
             lift_id=body.lift_id,
@@ -52,12 +52,12 @@ def create_event(svc: EventSvcDep, body: schemas.EventCreate) -> schemas.EventRe
 
 
 @router.get("/{event_id}", response_model=schemas.EventRead)
-def get_event(svc: EventSvcDep, event_id: int) -> schemas.EventRead:
-    return _to_read(svc.get(event_id))
+async def get_event(svc: EventSvcDep, event_id: int) -> schemas.EventRead:
+    return _to_read(await svc.get(event_id))
 
 
 @router.patch("/{event_id}", response_model=schemas.EventRead)
-def patch_event(svc: EventSvcDep, event_id: int, body: schemas.EventUpdate) -> schemas.EventRead:
+async def patch_event(svc: EventSvcDep, event_id: int, body: schemas.EventUpdate) -> schemas.EventRead:
     data = body.model_dump(exclude_unset=True)
-    updated = svc.update(event_id, **data)
+    updated = await svc.update(event_id, **data)
     return _to_read(updated)

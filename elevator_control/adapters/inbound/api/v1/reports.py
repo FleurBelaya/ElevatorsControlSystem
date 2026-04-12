@@ -20,12 +20,12 @@ def _to_read(r: e.Report) -> schemas.ReportRead:
 
 
 @router.get("", response_model=schemas.Paginated)
-def list_reports(
+async def list_reports(
     svc: ReportSvcDep,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ) -> schemas.Paginated:
-    items, total = svc.list_page(skip, limit)
+    items, total = await svc.list_page(skip, limit)
     return schemas.Paginated(
         items=[_to_read(x).model_dump() for x in items],
         total=total,
@@ -35,8 +35,8 @@ def list_reports(
 
 
 @router.post("", response_model=schemas.ReportRead, status_code=status.HTTP_201_CREATED)
-def create_report(svc: ReportSvcDep, body: schemas.ReportCreate) -> schemas.ReportRead:
-    created = svc.create(
+async def create_report(svc: ReportSvcDep, body: schemas.ReportCreate) -> schemas.ReportRead:
+    created = await svc.create(
         e.Report(
             id=None,
             service_request_id=body.service_request_id,
@@ -49,17 +49,17 @@ def create_report(svc: ReportSvcDep, body: schemas.ReportCreate) -> schemas.Repo
 
 
 @router.get("/{report_id}", response_model=schemas.ReportRead)
-def get_report(svc: ReportSvcDep, report_id: int) -> schemas.ReportRead:
-    return _to_read(svc.get(report_id))
+async def get_report(svc: ReportSvcDep, report_id: int) -> schemas.ReportRead:
+    return _to_read(await svc.get(report_id))
 
 
 @router.patch("/{report_id}", response_model=schemas.ReportRead)
-def patch_report(svc: ReportSvcDep, report_id: int, body: schemas.ReportUpdate) -> schemas.ReportRead:
+async def patch_report(svc: ReportSvcDep, report_id: int, body: schemas.ReportUpdate) -> schemas.ReportRead:
     data = body.model_dump(exclude_unset=True)
-    updated = svc.update(report_id, **data)
+    updated = await svc.update(report_id, **data)
     return _to_read(updated)
 
 
 @router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_report(svc: ReportSvcDep, report_id: int) -> None:
-    svc.delete(report_id)
+async def delete_report(svc: ReportSvcDep, report_id: int) -> None:
+    await svc.delete(report_id)

@@ -7,13 +7,13 @@ TODO: добавить Depends(get_current_user) с JWT и проверкой р
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from elevator_control.application import services as svc
 from elevator_control.adapters.outbound.persistence import repositories_impl as impl
 from elevator_control.infrastructure.database import get_session
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 def get_lift_service(session: SessionDep) -> svc.LiftApplicationService:

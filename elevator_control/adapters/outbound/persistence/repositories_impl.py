@@ -1,5 +1,5 @@
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from elevator_control.adapters.outbound.persistence import mappers, models as m
 from elevator_control.domain import entities as e
@@ -7,21 +7,24 @@ from elevator_control.domain.enums import EventStatus, EventType, ServiceRequest
 
 
 class SqlLiftRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, lift_id: int) -> e.Lift | None:
-        row = self._s.get(m.LiftModel, lift_id)
+    async def get_by_id(self, lift_id: int) -> e.Lift | None:
+        row = await self._s.get(m.LiftModel, lift_id)
         return mappers.lift_to_domain(row) if row else None
 
-    def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Lift], int]:
-        total = self._s.scalar(select(func.count()).select_from(m.LiftModel)) or 0
-        rows = self._s.scalars(
+    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Lift], int]:
+        total = (
+            await self._s.execute(select(func.count()).select_from(m.LiftModel))
+        ).scalar_one()
+        result = await self._s.execute(
             select(m.LiftModel).order_by(m.LiftModel.id).offset(offset).limit(limit)
-        ).all()
+        )
+        rows = result.scalars().all()
         return [mappers.lift_to_domain(r) for r in rows], int(total)
 
-    def create(self, lift: e.Lift) -> e.Lift:
+    async def create(self, lift: e.Lift) -> e.Lift:
         row = m.LiftModel(
             model=lift.model,
             status=lift.status.value,
@@ -29,22 +32,22 @@ class SqlLiftRepository:
             is_emergency=lift.is_emergency,
         )
         self._s.add(row)
-        self._s.flush()
+        await self._s.flush()
         return mappers.lift_to_domain(row)
 
-    def update(self, lift: e.Lift) -> e.Lift | None:
-        row = self._s.get(m.LiftModel, lift.id)
+    async def update(self, lift: e.Lift) -> e.Lift | None:
+        row = await self._s.get(m.LiftModel, lift.id)
         if row is None:
             return None
         row.model = lift.model
         row.status = lift.status.value
         row.location = lift.location
         row.is_emergency = lift.is_emergency
-        self._s.flush()
+        await self._s.flush()
         return mappers.lift_to_domain(row)
 
-    def delete(self, lift_id: int) -> bool:
-        row = self._s.get(m.LiftModel, lift_id)
+    async def delete(self, lift_id: int) -> bool:
+        row = await self._s.get(m.LiftModel, lift_id)
         if row is None:
             return False
         self._s.delete(row)
@@ -52,24 +55,26 @@ class SqlLiftRepository:
 
 
 class SqlSensorRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, sensor_id: int) -> e.Sensor | None:
-        row = self._s.get(m.SensorModel, sensor_id)
+    async def get_by_id(self, sensor_id: int) -> e.Sensor | None:
+        row = await self._s.get(m.SensorModel, sensor_id)
         return mappers.sensor_to_domain(row) if row else None
 
-    def list_by_lift(self, lift_id: int) -> list[e.Sensor]:
-        rows = self._s.scalars(
+    async def list_by_lift(self, lift_id: int) -> list[e.Sensor]:
+        result = await self._s.execute(
             select(m.SensorModel).where(m.SensorModel.lift_id == lift_id).order_by(m.SensorModel.id)
-        ).all()
+        )
+        rows = result.scalars().all()
         return [mappers.sensor_to_domain(r) for r in rows]
 
-    def list_all(self) -> list[e.Sensor]:
-        rows = self._s.scalars(select(m.SensorModel).order_by(m.SensorModel.id)).all()
+    async def list_all(self) -> list[e.Sensor]:
+        result = await self._s.execute(select(m.SensorModel).order_by(m.SensorModel.id))
+        rows = result.scalars().all()
         return [mappers.sensor_to_domain(r) for r in rows]
 
-    def create(self, sensor: e.Sensor) -> e.Sensor:
+    async def create(self, sensor: e.Sensor) -> e.Sensor:
         row = m.SensorModel(
             lift_id=sensor.lift_id,
             sensor_type=sensor.sensor_type,
@@ -77,21 +82,21 @@ class SqlSensorRepository:
             threshold_norm=sensor.threshold_norm,
         )
         self._s.add(row)
-        self._s.flush()
+        await self._s.flush()
         return mappers.sensor_to_domain(row)
 
-    def update(self, sensor: e.Sensor) -> e.Sensor | None:
-        row = self._s.get(m.SensorModel, sensor.id)
+    async def update(self, sensor: e.Sensor) -> e.Sensor | None:
+        row = await self._s.get(m.SensorModel, sensor.id)
         if row is None:
             return None
         row.sensor_type = sensor.sensor_type
         row.current_value = sensor.current_value
         row.threshold_norm = sensor.threshold_norm
-        self._s.flush()
+        await self._s.flush()
         return mappers.sensor_to_domain(row)
 
-    def delete(self, sensor_id: int) -> bool:
-        row = self._s.get(m.SensorModel, sensor_id)
+    async def delete(self, sensor_id: int) -> bool:
+        row = await self._s.get(m.SensorModel, sensor_id)
         if row is None:
             return False
         self._s.delete(row)
@@ -99,14 +104,14 @@ class SqlSensorRepository:
 
 
 class SqlEventRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, event_id: int) -> e.Event | None:
-        row = self._s.get(m.EventModel, event_id)
+    async def get_by_id(self, event_id: int) -> e.Event | None:
+        row = await self._s.get(m.EventModel, event_id)
         return mappers.event_to_domain(row) if row else None
 
-    def list_filtered(
+    async def list_filtered(
         self,
         offset: int,
         limit: int,
@@ -124,14 +129,17 @@ class SqlEventRepository:
         count_q = select(func.count()).select_from(m.EventModel)
         if filters:
             count_q = count_q.where(*filters)
-        total = self._s.scalar(count_q) or 0
+        total = (await self._s.execute(count_q)).scalar_one()
         q = select(m.EventModel)
         if filters:
             q = q.where(*filters)
-        rows = self._s.scalars(q.order_by(m.EventModel.id.desc()).offset(offset).limit(limit)).all()
+        result = await self._s.execute(
+            q.order_by(m.EventModel.id.desc()).offset(offset).limit(limit)
+        )
+        rows = result.scalars().all()
         return [mappers.event_to_domain(r) for r in rows], int(total)
 
-    def create(self, event: e.Event) -> e.Event:
+    async def create(self, event: e.Event) -> e.Event:
         row = m.EventModel(
             lift_id=event.lift_id,
             event_type=event.event_type.value,
@@ -139,20 +147,20 @@ class SqlEventRepository:
             status=event.status.value,
         )
         self._s.add(row)
-        self._s.flush()
+        await self._s.flush()
         return mappers.event_to_domain(row)
 
-    def update(self, event: e.Event) -> e.Event | None:
-        row = self._s.get(m.EventModel, event.id)
+    async def update(self, event: e.Event) -> e.Event | None:
+        row = await self._s.get(m.EventModel, event.id)
         if row is None:
             return None
         row.event_type = event.event_type.value
         row.description = event.description
         row.status = event.status.value
-        self._s.flush()
+        await self._s.flush()
         return mappers.event_to_domain(row)
 
-    def has_open_critical_for_lift(self, lift_id: int) -> bool:
+    async def has_open_critical_for_lift(self, lift_id: int) -> bool:
         q = (
             select(func.count())
             .select_from(m.EventModel)
@@ -162,19 +170,19 @@ class SqlEventRepository:
                 m.EventModel.status.in_([EventStatus.NEW.value, EventStatus.IN_PROGRESS.value]),
             )
         )
-        n = self._s.scalar(q) or 0
-        return n > 0
+        n = (await self._s.execute(q)).scalar_one()
+        return int(n) > 0
 
 
 class SqlServiceRequestRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, request_id: int) -> e.ServiceRequest | None:
-        row = self._s.get(m.ServiceRequestModel, request_id)
+    async def get_by_id(self, request_id: int) -> e.ServiceRequest | None:
+        row = await self._s.get(m.ServiceRequestModel, request_id)
         return mappers.service_request_to_domain(row) if row else None
 
-    def list_filtered(
+    async def list_filtered(
         self,
         offset: int,
         limit: int,
@@ -189,14 +197,17 @@ class SqlServiceRequestRepository:
         count_q = select(func.count()).select_from(m.ServiceRequestModel)
         if filters:
             count_q = count_q.where(*filters)
-        total = self._s.scalar(count_q) or 0
+        total = (await self._s.execute(count_q)).scalar_one()
         q = select(m.ServiceRequestModel)
         if filters:
             q = q.where(*filters)
-        rows = self._s.scalars(q.order_by(m.ServiceRequestModel.id.desc()).offset(offset).limit(limit)).all()
+        result = await self._s.execute(
+            q.order_by(m.ServiceRequestModel.id.desc()).offset(offset).limit(limit)
+        )
+        rows = result.scalars().all()
         return [mappers.service_request_to_domain(r) for r in rows], int(total)
 
-    def create(self, req: e.ServiceRequest) -> e.ServiceRequest:
+    async def create(self, req: e.ServiceRequest) -> e.ServiceRequest:
         row = m.ServiceRequestModel(
             lift_id=req.lift_id,
             reason=req.reason,
@@ -204,21 +215,21 @@ class SqlServiceRequestRepository:
             technician_id=req.technician_id,
         )
         self._s.add(row)
-        self._s.flush()
+        await self._s.flush()
         return mappers.service_request_to_domain(row)
 
-    def update(self, req: e.ServiceRequest) -> e.ServiceRequest | None:
-        row = self._s.get(m.ServiceRequestModel, req.id)
+    async def update(self, req: e.ServiceRequest) -> e.ServiceRequest | None:
+        row = await self._s.get(m.ServiceRequestModel, req.id)
         if row is None:
             return None
         row.reason = req.reason
         row.status = req.status.value
         row.technician_id = req.technician_id
-        self._s.flush()
+        await self._s.flush()
         return mappers.service_request_to_domain(row)
 
-    def delete(self, request_id: int) -> bool:
-        row = self._s.get(m.ServiceRequestModel, request_id)
+    async def delete(self, request_id: int) -> bool:
+        row = await self._s.get(m.ServiceRequestModel, request_id)
         if row is None:
             return False
         self._s.delete(row)
@@ -226,37 +237,40 @@ class SqlServiceRequestRepository:
 
 
 class SqlTechnicianRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, tech_id: int) -> e.Technician | None:
-        row = self._s.get(m.TechnicianModel, tech_id)
+    async def get_by_id(self, tech_id: int) -> e.Technician | None:
+        row = await self._s.get(m.TechnicianModel, tech_id)
         return mappers.technician_to_domain(row) if row else None
 
-    def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Technician], int]:
-        total = self._s.scalar(select(func.count()).select_from(m.TechnicianModel)) or 0
-        rows = self._s.scalars(
+    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Technician], int]:
+        total = (
+            await self._s.execute(select(func.count()).select_from(m.TechnicianModel))
+        ).scalar_one()
+        result = await self._s.execute(
             select(m.TechnicianModel).order_by(m.TechnicianModel.id).offset(offset).limit(limit)
-        ).all()
+        )
+        rows = result.scalars().all()
         return [mappers.technician_to_domain(r) for r in rows], int(total)
 
-    def create(self, tech: e.Technician) -> e.Technician:
+    async def create(self, tech: e.Technician) -> e.Technician:
         row = m.TechnicianModel(name=tech.name, status=tech.status.value)
         self._s.add(row)
-        self._s.flush()
+        await self._s.flush()
         return mappers.technician_to_domain(row)
 
-    def update(self, tech: e.Technician) -> e.Technician | None:
-        row = self._s.get(m.TechnicianModel, tech.id)
+    async def update(self, tech: e.Technician) -> e.Technician | None:
+        row = await self._s.get(m.TechnicianModel, tech.id)
         if row is None:
             return None
         row.name = tech.name
         row.status = tech.status.value
-        self._s.flush()
+        await self._s.flush()
         return mappers.technician_to_domain(row)
 
-    def delete(self, tech_id: int) -> bool:
-        row = self._s.get(m.TechnicianModel, tech_id)
+    async def delete(self, tech_id: int) -> bool:
+        row = await self._s.get(m.TechnicianModel, tech_id)
         if row is None:
             return False
         self._s.delete(row)
@@ -264,42 +278,45 @@ class SqlTechnicianRepository:
 
 
 class SqlReportRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
-    def get_by_id(self, report_id: int) -> e.Report | None:
-        row = self._s.get(m.ReportModel, report_id)
+    async def get_by_id(self, report_id: int) -> e.Report | None:
+        row = await self._s.get(m.ReportModel, report_id)
         return mappers.report_to_domain(row) if row else None
 
-    def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Report], int]:
-        total = self._s.scalar(select(func.count()).select_from(m.ReportModel)) or 0
-        rows = self._s.scalars(
+    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Report], int]:
+        total = (
+            await self._s.execute(select(func.count()).select_from(m.ReportModel))
+        ).scalar_one()
+        result = await self._s.execute(
             select(m.ReportModel).order_by(m.ReportModel.id.desc()).offset(offset).limit(limit)
-        ).all()
+        )
+        rows = result.scalars().all()
         return [mappers.report_to_domain(r) for r in rows], int(total)
 
-    def create(self, report: e.Report) -> e.Report:
+    async def create(self, report: e.Report) -> e.Report:
         row = m.ReportModel(
             service_request_id=report.service_request_id,
             work_description=report.work_description,
             final_lift_status=report.final_lift_status.value,
         )
         self._s.add(row)
-        self._s.flush()
-        self._s.refresh(row)
+        await self._s.flush()
+        await self._s.refresh(row)
         return mappers.report_to_domain(row)
 
-    def update(self, report: e.Report) -> e.Report | None:
-        row = self._s.get(m.ReportModel, report.id)
+    async def update(self, report: e.Report) -> e.Report | None:
+        row = await self._s.get(m.ReportModel, report.id)
         if row is None:
             return None
         row.work_description = report.work_description
         row.final_lift_status = report.final_lift_status.value
-        self._s.flush()
+        await self._s.flush()
         return mappers.report_to_domain(row)
 
-    def delete(self, report_id: int) -> bool:
-        row = self._s.get(m.ReportModel, report_id)
+    async def delete(self, report_id: int) -> bool:
+        row = await self._s.get(m.ReportModel, report_id)
         if row is None:
             return False
         self._s.delete(row)

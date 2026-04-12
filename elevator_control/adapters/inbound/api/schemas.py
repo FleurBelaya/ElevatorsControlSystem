@@ -147,3 +147,22 @@ class Paginated(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class EmergencyDemoRequest(BaseModel):
+    """Тело POST для демонстрации атомарной аварийной транзакции."""
+
+    sensor_id: int | None = Field(
+        default=None,
+        description="Если не указан — берётся первый датчик лифта по id",
+    )
+    note: str | None = Field(default=None, max_length=512, description="Доп. текст в описание инцидента")
+
+
+class EmergencyDemoResponse(BaseModel):
+    lift_id: int
+    event_id: int
+    service_request_id: int
+    sensor_id: int
+    sensor_value_after: float
+    message: str

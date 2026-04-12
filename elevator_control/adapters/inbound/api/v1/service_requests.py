@@ -20,14 +20,14 @@ def _to_read(req: e.ServiceRequest) -> schemas.ServiceRequestRead:
 
 
 @router.get("", response_model=schemas.Paginated)
-def list_service_requests(
+async def list_service_requests(
     svc: ServiceRequestSvcDep,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     lift_id: int | None = None,
     status_filter: ServiceRequestStatus | None = Query(None, alias="status"),
 ) -> schemas.Paginated:
-    items, total = svc.list_page(skip, limit, lift_id, status_filter)
+    items, total = await svc.list_page(skip, limit, lift_id, status_filter)
     return schemas.Paginated(
         items=[_to_read(x).model_dump() for x in items],
         total=total,
@@ -37,8 +37,10 @@ def list_service_requests(
 
 
 @router.post("", response_model=schemas.ServiceRequestRead, status_code=status.HTTP_201_CREATED)
-def create_service_request(svc: ServiceRequestSvcDep, body: schemas.ServiceRequestCreate) -> schemas.ServiceRequestRead:
-    created = svc.create(
+async def create_service_request(
+    svc: ServiceRequestSvcDep, body: schemas.ServiceRequestCreate
+) -> schemas.ServiceRequestRead:
+    created = await svc.create(
         e.ServiceRequest(
             id=None,
             lift_id=body.lift_id,
@@ -51,19 +53,19 @@ def create_service_request(svc: ServiceRequestSvcDep, body: schemas.ServiceReque
 
 
 @router.get("/{request_id}", response_model=schemas.ServiceRequestRead)
-def get_service_request(svc: ServiceRequestSvcDep, request_id: int) -> schemas.ServiceRequestRead:
-    return _to_read(svc.get(request_id))
+async def get_service_request(svc: ServiceRequestSvcDep, request_id: int) -> schemas.ServiceRequestRead:
+    return _to_read(await svc.get(request_id))
 
 
 @router.patch("/{request_id}", response_model=schemas.ServiceRequestRead)
-def patch_service_request(
+async def patch_service_request(
     svc: ServiceRequestSvcDep, request_id: int, body: schemas.ServiceRequestUpdate
 ) -> schemas.ServiceRequestRead:
     data = body.model_dump(exclude_unset=True)
-    updated = svc.update(request_id, **data)
+    updated = await svc.update(request_id, **data)
     return _to_read(updated)
 
 
 @router.delete("/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_service_request(svc: ServiceRequestSvcDep, request_id: int) -> None:
-    svc.delete(request_id)
+async def delete_service_request(svc: ServiceRequestSvcDep, request_id: int) -> None:
+    await svc.delete(request_id)

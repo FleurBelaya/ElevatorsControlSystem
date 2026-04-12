@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Выше порога — предупреждение; выше порога * CRITICAL_MULTIPLIER — критическое / авария
 CRITICAL_MULTIPLIER = 1.2
 
 
@@ -28,16 +27,15 @@ def _classify(value: float, threshold: float) -> str | None:
     return "warning"
 
 
-def run_sensor_simulation_tick(
+async def run_sensor_simulation_tick(
     lifts: r.LiftRepository,
     sensors: r.SensorRepository,
     events: r.EventRepository,
     requests: r.ServiceRequestRepository,
 ) -> None:
-    """Один цикл: небольшой случайный дрейф показаний, фиксация отклонений и аварийная реакция."""
-    all_sensors = sensors.list_all()
+    all_sensors = await sensors.list_all()
     for sensor in all_sensors:
-        lift = lifts.get_by_id(sensor.lift_id)
+        lift = await lifts.get_by_id(sensor.lift_id)
         if lift is None:
             continue
         if lift.status == LiftStatus.MAINTENANCE:
@@ -51,7 +49,7 @@ def run_sensor_simulation_tick(
         old_zone = _classify(old_value, sensor.threshold_norm)
         new_zone = _classify(new_value, sensor.threshold_norm)
 
-        sensors.update(
+        await sensors.update(
             e.Sensor(
                 id=sensor.id,
                 lift_id=sensor.lift_id,
@@ -65,12 +63,12 @@ def run_sensor_simulation_tick(
             continue
 
         if new_zone == "critical":
-            _handle_critical(lifts, events, requests, lift, sensor, new_value)
+            await _handle_critical(lifts, events, requests, lift, sensor, new_value)
         elif new_zone == "warning" and old_zone is None:
-            _handle_warning(events, lift, sensor, new_value)
+            await _handle_warning(events, lift, sensor, new_value)
 
 
-def _handle_critical(
+async def _handle_critical(
     lifts: r.LiftRepository,
     events: r.EventRepository,
     requests: r.ServiceRequestRepository,
@@ -78,8 +76,8 @@ def _handle_critical(
     sensor: e.Sensor,
     new_value: float,
 ) -> None:
-    if events.has_open_critical_for_lift(lift.id):
-        lifts.update(
+    if await events.has_open_critical_for_lift(lift.id):
+        await lifts.update(
             e.Lift(
                 id=lift.id,
                 model=lift.model,
@@ -94,7 +92,7 @@ def _handle_critical(
         f"Критическое отклонение датчика «{sensor.sensor_type}»: "
         f"значение {new_value:.3f}, порог {sensor.threshold_norm:.3f}"
     )
-    events.create(
+    await events.create(
         e.Event(
             id=None,
             lift_id=lift.id,
@@ -103,7 +101,7 @@ def _handle_critical(
             status=EventStatus.NEW,
         )
     )
-    requests.create(
+    await requests.create(
         e.ServiceRequest(
             id=None,
             lift_id=lift.id,
@@ -112,7 +110,7 @@ def _handle_critical(
             technician_id=None,
         )
     )
-    lifts.update(
+    await lifts.update(
         e.Lift(
             id=lift.id,
             model=lift.model,
@@ -124,12 +122,12 @@ def _handle_critical(
     logger.warning("Аварийная остановка лифта id=%s, датчик id=%s", lift.id, sensor.id)
 
 
-def _handle_warning(events: r.EventRepository, lift: e.Lift, sensor: e.Sensor, new_value: float) -> None:
+async def _handle_warning(events: r.EventRepository, lift: e.Lift, sensor: e.Sensor, new_value: float) -> None:
     desc = (
         f"Предупреждение по датчику «{sensor.sensor_type}»: "
         f"значение {new_value:.3f}, порог {sensor.threshold_norm:.3f}"
     )
-    events.create(
+    await events.create(
         e.Event(
             id=None,
             lift_id=lift.id,

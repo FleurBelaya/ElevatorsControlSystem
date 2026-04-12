@@ -20,8 +20,8 @@ def _to_read(s: e.Sensor) -> schemas.SensorRead:
 
 
 @router.get("/{lift_id}/sensors", response_model=list[schemas.SensorRead])
-def list_sensors(svc: SensorSvcDep, lift_id: int) -> list[schemas.SensorRead]:
-    return [_to_read(x) for x in svc.list_for_lift(lift_id)]
+async def list_sensors(svc: SensorSvcDep, lift_id: int) -> list[schemas.SensorRead]:
+    return [_to_read(x) for x in await svc.list_for_lift(lift_id)]
 
 
 @router.post(
@@ -29,8 +29,8 @@ def list_sensors(svc: SensorSvcDep, lift_id: int) -> list[schemas.SensorRead]:
     response_model=schemas.SensorRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_sensor(svc: SensorSvcDep, lift_id: int, body: schemas.SensorCreate) -> schemas.SensorRead:
-    created = svc.create(
+async def create_sensor(svc: SensorSvcDep, lift_id: int, body: schemas.SensorCreate) -> schemas.SensorRead:
+    created = await svc.create(
         e.Sensor(
             id=None,
             lift_id=lift_id,
@@ -43,17 +43,17 @@ def create_sensor(svc: SensorSvcDep, lift_id: int, body: schemas.SensorCreate) -
 
 
 @item_router.get("/{sensor_id}", response_model=schemas.SensorRead)
-def get_sensor(svc: SensorSvcDep, sensor_id: int) -> schemas.SensorRead:
-    return _to_read(svc.get(sensor_id))
+async def get_sensor(svc: SensorSvcDep, sensor_id: int) -> schemas.SensorRead:
+    return _to_read(await svc.get(sensor_id))
 
 
 @item_router.patch("/{sensor_id}", response_model=schemas.SensorRead)
-def patch_sensor(svc: SensorSvcDep, sensor_id: int, body: schemas.SensorUpdate) -> schemas.SensorRead:
+async def patch_sensor(svc: SensorSvcDep, sensor_id: int, body: schemas.SensorUpdate) -> schemas.SensorRead:
     data = body.model_dump(exclude_unset=True)
-    updated = svc.update(sensor_id, **data)
+    updated = await svc.update(sensor_id, **data)
     return _to_read(updated)
 
 
 @item_router.delete("/{sensor_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_sensor(svc: SensorSvcDep, sensor_id: int) -> None:
-    svc.delete(sensor_id)
+async def delete_sensor(svc: SensorSvcDep, sensor_id: int) -> None:
+    await svc.delete(sensor_id)
