@@ -2,8 +2,69 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from elevator_control.adapters.outbound.persistence import mappers, models as m
+from elevator_control.domain import auth
 from elevator_control.domain import entities as e
 from elevator_control.domain.enums import EventStatus, EventType, ServiceRequestStatus
+from elevator_control.domain.exceptions import NotFoundError
+
+
+class SqlAuthRepository:
+    # 2.1 Авторизация RBAC
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def count_users(self) -> int:
+        return int((await self._s.execute(select(func.count()).select_from(m.UserModel))).scalar_one())
+
+    async def get_user_by_id(self, user_id: int) -> auth.User | None:
+        row = await self._s.get(m.UserModel, user_id)
+        if row is None:
+            return None
+        return auth.User(id=row.id, email=row.email)
+
+    async def get_user_credentials_by_email(self, email: str) -> auth.UserCredentials | None:
+        row = (
+            await self._s.execute(select(m.UserModel).where(m.UserModel.email == email))
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        return auth.UserCredentials(
+            id=row.id,
+            email=row.email,
+            password_hash=row.password_hash,
+            is_active=row.is_active,
+        )
+
+    async def create_user(self, email: str, password_hash: str) -> auth.User:
+        row = m.UserModel(email=email, password_hash=password_hash, is_active=True)
+        self._s.add(row)
+        await self._s.flush()
+        return auth.User(id=row.id, email=row.email)
+
+    async def assign_role_to_user(self, user_id: int, role_name: str) -> None:
+        user = await self._s.get(m.UserModel, user_id)
+        if user is None:
+            raise NotFoundError("Пользователь не найден")
+        role = (
+            await self._s.execute(select(m.RoleModel).where(m.RoleModel.name == role_name))
+        ).scalar_one_or_none()
+        if role is None:
+            raise NotFoundError("Роль не найдена")
+        if role not in user.roles:
+            user.roles.append(role)
+        await self._s.flush()
+
+    async def list_permission_names_for_user(self, user_id: int) -> set[str]:
+        q = (
+            select(m.PermissionModel.name)
+            .select_from(m.PermissionModel)
+            .join(m.role_permissions, m.role_permissions.c.permission_id == m.PermissionModel.id)
+            .join(m.RoleModel, m.RoleModel.id == m.role_permissions.c.role_id)
+            .join(m.user_roles, m.user_roles.c.role_id == m.RoleModel.id)
+            .where(m.user_roles.c.user_id == user_id)
+        )
+        rows = (await self._s.execute(q)).scalars().all()
+        return set(rows)
 
 
 class SqlLiftRepository:
@@ -14,18 +75,24 @@ class SqlLiftRepository:
         row = await self._s.get(m.LiftModel, lift_id)
         return mappers.lift_to_domain(row) if row else None
 
-    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Lift], int]:
-        total = (
-            await self._s.execute(select(func.count()).select_from(m.LiftModel))
-        ).scalar_one()
+    async def list_paginated(
+        self, owner_id: int | None, offset: int, limit: int
+    ) -> tuple[list[e.Lift], int]:
+        base_q = select(m.LiftModel)
+        count_q = select(func.count()).select_from(m.LiftModel)
+        if owner_id is not None:
+            base_q = base_q.where(m.LiftModel.owner_id == owner_id)
+            count_q = count_q.where(m.LiftModel.owner_id == owner_id)
+        total = (await self._s.execute(count_q)).scalar_one()
         result = await self._s.execute(
-            select(m.LiftModel).order_by(m.LiftModel.id).offset(offset).limit(limit)
+            base_q.order_by(m.LiftModel.id).offset(offset).limit(limit)
         )
         rows = result.scalars().all()
         return [mappers.lift_to_domain(r) for r in rows], int(total)
 
     async def create(self, lift: e.Lift) -> e.Lift:
         row = m.LiftModel(
+            owner_id=lift.owner_id,
             model=lift.model,
             status=lift.status.value,
             location=lift.location,
@@ -76,6 +143,7 @@ class SqlSensorRepository:
 
     async def create(self, sensor: e.Sensor) -> e.Sensor:
         row = m.SensorModel(
+            owner_id=sensor.owner_id,
             lift_id=sensor.lift_id,
             sensor_type=sensor.sensor_type,
             current_value=sensor.current_value,
@@ -113,6 +181,7 @@ class SqlEventRepository:
 
     async def list_filtered(
         self,
+        owner_id: int | None,
         offset: int,
         limit: int,
         lift_id: int | None,
@@ -122,6 +191,8 @@ class SqlEventRepository:
         filters = []
         if lift_id is not None:
             filters.append(m.EventModel.lift_id == lift_id)
+        if owner_id is not None:
+            filters.append(m.EventModel.owner_id == owner_id)
         if status is not None:
             filters.append(m.EventModel.status == status.value)
         if event_type is not None:
@@ -141,6 +212,7 @@ class SqlEventRepository:
 
     async def create(self, event: e.Event) -> e.Event:
         row = m.EventModel(
+            owner_id=event.owner_id,
             lift_id=event.lift_id,
             event_type=event.event_type.value,
             description=event.description,
@@ -184,6 +256,7 @@ class SqlServiceRequestRepository:
 
     async def list_filtered(
         self,
+        owner_id: int | None,
         offset: int,
         limit: int,
         lift_id: int | None,
@@ -192,6 +265,8 @@ class SqlServiceRequestRepository:
         filters = []
         if lift_id is not None:
             filters.append(m.ServiceRequestModel.lift_id == lift_id)
+        if owner_id is not None:
+            filters.append(m.ServiceRequestModel.owner_id == owner_id)
         if status is not None:
             filters.append(m.ServiceRequestModel.status == status.value)
         count_q = select(func.count()).select_from(m.ServiceRequestModel)
@@ -209,6 +284,7 @@ class SqlServiceRequestRepository:
 
     async def create(self, req: e.ServiceRequest) -> e.ServiceRequest:
         row = m.ServiceRequestModel(
+            owner_id=req.owner_id,
             lift_id=req.lift_id,
             reason=req.reason,
             status=req.status.value,
@@ -244,18 +320,23 @@ class SqlTechnicianRepository:
         row = await self._s.get(m.TechnicianModel, tech_id)
         return mappers.technician_to_domain(row) if row else None
 
-    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Technician], int]:
-        total = (
-            await self._s.execute(select(func.count()).select_from(m.TechnicianModel))
-        ).scalar_one()
+    async def list_paginated(
+        self, owner_id: int | None, offset: int, limit: int
+    ) -> tuple[list[e.Technician], int]:
+        base_q = select(m.TechnicianModel)
+        count_q = select(func.count()).select_from(m.TechnicianModel)
+        if owner_id is not None:
+            base_q = base_q.where(m.TechnicianModel.owner_id == owner_id)
+            count_q = count_q.where(m.TechnicianModel.owner_id == owner_id)
+        total = (await self._s.execute(count_q)).scalar_one()
         result = await self._s.execute(
-            select(m.TechnicianModel).order_by(m.TechnicianModel.id).offset(offset).limit(limit)
+            base_q.order_by(m.TechnicianModel.id).offset(offset).limit(limit)
         )
         rows = result.scalars().all()
         return [mappers.technician_to_domain(r) for r in rows], int(total)
 
     async def create(self, tech: e.Technician) -> e.Technician:
-        row = m.TechnicianModel(name=tech.name, status=tech.status.value)
+        row = m.TechnicianModel(owner_id=tech.owner_id, name=tech.name, status=tech.status.value)
         self._s.add(row)
         await self._s.flush()
         return mappers.technician_to_domain(row)
@@ -285,18 +366,24 @@ class SqlReportRepository:
         row = await self._s.get(m.ReportModel, report_id)
         return mappers.report_to_domain(row) if row else None
 
-    async def list_paginated(self, offset: int, limit: int) -> tuple[list[e.Report], int]:
-        total = (
-            await self._s.execute(select(func.count()).select_from(m.ReportModel))
-        ).scalar_one()
+    async def list_paginated(
+        self, owner_id: int | None, offset: int, limit: int
+    ) -> tuple[list[e.Report], int]:
+        base_q = select(m.ReportModel)
+        count_q = select(func.count()).select_from(m.ReportModel)
+        if owner_id is not None:
+            base_q = base_q.where(m.ReportModel.owner_id == owner_id)
+            count_q = count_q.where(m.ReportModel.owner_id == owner_id)
+        total = (await self._s.execute(count_q)).scalar_one()
         result = await self._s.execute(
-            select(m.ReportModel).order_by(m.ReportModel.id.desc()).offset(offset).limit(limit)
+            base_q.order_by(m.ReportModel.id.desc()).offset(offset).limit(limit)
         )
         rows = result.scalars().all()
         return [mappers.report_to_domain(r) for r in rows], int(total)
 
     async def create(self, report: e.Report) -> e.Report:
         row = m.ReportModel(
+            owner_id=report.owner_id,
             service_request_id=report.service_request_id,
             work_description=report.work_description,
             final_lift_status=report.final_lift_status.value,

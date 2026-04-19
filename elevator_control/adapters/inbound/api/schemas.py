@@ -195,3 +195,27 @@ class EmergencyDemoResponse(BaseModel):
     sensor_id: int
     sensor_value_after: float
     message: str
+
+
+class UserRegister(BaseModel):
+    # 2.1 Авторизация RBAC
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., min_length=8, max_length=256)
+
+
+class UserLogin(BaseModel):
+    # 2.1 Авторизация RBAC
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., min_length=1, max_length=256)
+
+
+class TokenResponse(BaseModel):
+    # 2.1 Авторизация RBAC
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserRead(BaseModel):
+    # 2.1 Авторизация RBAC
+    id: int
+    email: str

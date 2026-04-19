@@ -14,7 +14,7 @@ from sqlalchemy import text
 from elevator_control.adapters.inbound.api.v1 import api_v1_router
 from elevator_control.adapters.outbound.persistence import repositories_impl as impl
 from elevator_control.application.simulation import run_sensor_simulation_tick
-from elevator_control.domain.exceptions import ConflictError, NotFoundError
+from elevator_control.domain.exceptions import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError
 from elevator_control.infrastructure.config import settings
 from elevator_control.infrastructure.database import AsyncSessionLocal, engine
 
@@ -89,6 +89,16 @@ async def not_found_handler(_request: Request, exc: NotFoundError) -> JSONRespon
 @app.exception_handler(ConflictError)
 async def conflict_handler(_request: Request, exc: ConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(UnauthorizedError)
+async def unauthorized_handler(_request: Request, exc: UnauthorizedError) -> JSONResponse:
+    return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+
+@app.exception_handler(ForbiddenError)
+async def forbidden_handler(_request: Request, exc: ForbiddenError) -> JSONResponse:
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 # @app.get("/health")

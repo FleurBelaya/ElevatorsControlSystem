@@ -52,6 +52,7 @@ async def run_sensor_simulation_tick(
         await sensors.update(
             e.Sensor(
                 id=sensor.id,
+                owner_id=sensor.owner_id,
                 lift_id=sensor.lift_id,
                 sensor_type=sensor.sensor_type,
                 current_value=new_value,
@@ -80,6 +81,7 @@ async def _handle_critical(
         await lifts.update(
             e.Lift(
                 id=lift.id,
+                owner_id=lift.owner_id,
                 model=lift.model,
                 status=LiftStatus.STOPPED,
                 location=lift.location,
@@ -95,6 +97,7 @@ async def _handle_critical(
     await events.create(
         e.Event(
             id=None,
+            owner_id=lift.owner_id,
             lift_id=lift.id,
             event_type=EventType.CRITICAL,
             description=desc,
@@ -104,6 +107,7 @@ async def _handle_critical(
     await requests.create(
         e.ServiceRequest(
             id=None,
+            owner_id=lift.owner_id,
             lift_id=lift.id,
             reason=f"Автоматическая заявка: {desc}",
             status=ServiceRequestStatus.PENDING,
@@ -113,6 +117,7 @@ async def _handle_critical(
     await lifts.update(
         e.Lift(
             id=lift.id,
+            owner_id=lift.owner_id,
             model=lift.model,
             status=LiftStatus.STOPPED,
             location=lift.location,
@@ -130,6 +135,7 @@ async def _handle_warning(events: r.EventRepository, lift: e.Lift, sensor: e.Sen
     await events.create(
         e.Event(
             id=None,
+            owner_id=lift.owner_id,
             lift_id=lift.id,
             event_type=EventType.WARNING,
             description=desc,

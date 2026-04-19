@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     simulation_interval_seconds: float = 4.0
 
+    # 2.1 Авторизация RBAC
+    jwt_secret_key: str = "CHANGE_ME"
+    access_token_ttl_seconds: int = 60 * 60
+
     @property
     def database_url_async(self) -> str:
         """URL для SQLAlchemy AsyncEngine (драйвер asyncpg)."""
