@@ -1,12 +1,3 @@
-"""
-Транспортный слой (FastAPI).
-
-TODO: добавить аутентификацию и авторизацию:
-- JWT (OAuth2 password flow или bearer tokens)
-- сопоставление ролей: диспетчер / техник / администратор
-- зависимости FastAPI Depends(get_current_user), проверка прав на эндпоинты
-"""
-
 # запуск: python -m uvicorn elevator_control.main:app --reload
 
 from __future__ import annotations
