@@ -39,5 +39,5 @@ uvicorn==0.43.0
 watchfiles==1.1.1
 websockets==16.0
 celery==5.4.0
-redis==5.2.1
+sqlalchemy-celery-beat==0.8.2
 python-docx==1.1.2

@@ -20,9 +20,11 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "CHANGE_ME"
     access_token_ttl_seconds: int = 60 * 60
 
-    # 2.5.2 - Интеграция очереди: настройки Celery + Redis
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend: str = "redis://localhost:6379/0"
+    # 2.5.2 - Интеграция очереди: настройки Celery
+    # По умолчанию используется файловый брокер (SQLite/filesystem) — работает
+    # без установки Redis/RabbitMQ. Для продакшена замените на redis://localhost:6379/0
+    celery_broker_url: str = "filesystem://"
+    celery_result_backend: str = "db+sqlite:///celery_results.db"
 
     @property
     def database_url_async(self) -> str:
