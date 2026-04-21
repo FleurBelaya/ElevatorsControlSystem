@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import text
 
 from elevator_control.adapters.inbound.api.v1 import api_v1_router
@@ -18,7 +20,12 @@ from elevator_control.domain.exceptions import ConflictError, ForbiddenError, No
 from elevator_control.infrastructure.config import settings
 from elevator_control.infrastructure.database import AsyncSessionLocal, engine
 
-logging.basicConfig(level=logging.INFO)
+# 2.4 - Логгирование: настройка структурированного формата логов
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +86,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# 2.4 - Логгирование: middleware для логирования каждого HTTP-запроса
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s → %s (%.1f ms)",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.exception_handler(NotFoundError)

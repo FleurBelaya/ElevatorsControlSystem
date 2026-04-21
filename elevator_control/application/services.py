@@ -1,3 +1,6 @@
+# 2.4 - Логгирование: добавлен логгер для слоя Application Services
+import logging
+
 from elevator_control.application.auth import AuthorizationService
 from elevator_control.domain import auth as domain_auth
 from elevator_control.domain import entities as e
@@ -10,6 +13,8 @@ from elevator_control.domain.enums import (
 )
 from elevator_control.domain.exceptions import NotFoundError
 from elevator_control.ports.outbound import repositories as r
+
+logger = logging.getLogger(__name__)
 
 
 def _not_found(msg: str) -> NotFoundError:
@@ -34,21 +39,29 @@ class LiftApplicationService:
     async def get(self, actor: domain_auth.User, lift_id: int) -> e.Lift:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:read")
+        # 2.4 - Логгирование: запрос конкретного лифта
+        logger.info("Пользователь id=%s запрашивает лифт id=%s", actor.id, lift_id)
         lift = await self._lifts.get_by_id(lift_id)
         if lift is None:
+            logger.warning("Лифт id=%s не найден", lift_id)
             raise _not_found("Лифт не найден")
         if (await self._owner_filter(actor)) is not None and lift.owner_id != actor.id:
+            logger.warning("Доступ запрещён: лифт id=%s не принадлежит пользователю id=%s", lift_id, actor.id)
             raise _not_found("Лифт не найден")
         return lift
 
     async def list_page(self, actor: domain_auth.User, skip: int, limit: int) -> tuple[list[e.Lift], int]:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:read")
+        # 2.4 - Логгирование: список лифтов
+        logger.info("Пользователь id=%s запрашивает список лифтов (skip=%s, limit=%s)", actor.id, skip, limit)
         return await self._lifts.list_paginated(await self._owner_filter(actor), skip, limit)
 
     async def create(self, actor: domain_auth.User, lift: e.Lift) -> e.Lift:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:create")
+        # 2.4 - Логгирование: создание лифта
+        logger.info("Пользователь id=%s создаёт лифт model=%s", actor.id, lift.model)
         return await self._lifts.create(
             e.Lift(
                 id=None,
@@ -63,6 +76,8 @@ class LiftApplicationService:
     async def update(self, actor: domain_auth.User, lift_id: int, **fields) -> e.Lift:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:update")
+        # 2.4 - Логгирование: обновление лифта
+        logger.info("Пользователь id=%s обновляет лифт id=%s, поля=%s", actor.id, lift_id, list(fields.keys()))
         current = await self.get(actor, lift_id)
         updated = e.Lift(
             id=current.id,
@@ -79,6 +94,8 @@ class LiftApplicationService:
     async def delete(self, actor: domain_auth.User, lift_id: int) -> None:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:delete")
+        # 2.4 - Логгирование: удаление лифта
+        logger.info("Пользователь id=%s удаляет лифт id=%s", actor.id, lift_id)
         _ = await self.get(actor, lift_id)
         if not await self._lifts.delete(lift_id):
             raise _not_found("Лифт не найден")
@@ -93,6 +110,8 @@ class LiftApplicationService:
     ) -> tuple[e.Lift, list[e.Sensor]]:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "lifts:restore_state")
+        # 2.4 - Логгирование: восстановление состояния лифта
+        logger.info("Пользователь id=%s восстанавливает лифт id=%s, статус=%s", actor.id, lift_id, target_status.value)
         current = await self.get(actor, lift_id)
         restored_lift = await self._lifts.update(
             e.Lift(
@@ -450,6 +469,8 @@ class ReportApplicationService:
     async def create(self, actor: domain_auth.User, report: e.Report) -> e.Report:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "reports:create")
+        # 2.4 - Логгирование: создание отчёта
+        logger.info("Пользователь id=%s создаёт отчёт для заявки id=%s", actor.id, report.service_request_id)
         req = await self._requests.get_by_id(report.service_request_id)
         if req is None:
             raise _not_found("Заявка не найдена")
@@ -572,6 +593,8 @@ class EventApplicationService:
     async def create(self, actor: domain_auth.User, event: e.Event) -> e.Event:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "events:create")
+        # 2.4 - Логгирование: создание события
+        logger.info("Пользователь id=%s создаёт событие типа=%s для лифта id=%s", actor.id, event.event_type.value, event.lift_id)
         lift = await self._ensure_lift_access(actor, event.lift_id)
         return await self._events.create(
             e.Event(
@@ -587,6 +610,8 @@ class EventApplicationService:
     async def update(self, actor: domain_auth.User, event_id: int, **fields) -> e.Event:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "events:update")
+        # 2.4 - Логгирование: обновление события
+        logger.info("Пользователь id=%s обновляет событие id=%s", actor.id, event_id)
         current = await self.get(actor, event_id)
         updated = e.Event(
             id=current.id,
@@ -660,6 +685,8 @@ class ServiceRequestApplicationService:
     async def create(self, actor: domain_auth.User, req: e.ServiceRequest) -> e.ServiceRequest:
         # 2.1 Авторизация RBAC
         await self._authz.require(actor.id, "service_requests:create")
+        # 2.4 - Логгирование: создание заявки на обслуживание
+        logger.info("Пользователь id=%s создаёт заявку для лифта id=%s", actor.id, req.lift_id)
         lift = await self._ensure_lift_access(actor, req.lift_id)
         if req.technician_id is not None:
             await self._ensure_technician_access(actor, req.technician_id)
