@@ -1,5 +1,8 @@
+# 2.3 - Оптимизация ORM: в репозиториях используется явный eager loading
+# через selectinload/joinedload для связей, которые нужны в конкретном запросе.
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload, joinedload
 
 from elevator_control.adapters.outbound.persistence import mappers, models as m
 from elevator_control.domain import auth
@@ -17,7 +20,15 @@ class SqlAuthRepository:
         return int((await self._s.execute(select(func.count()).select_from(m.UserModel))).scalar_one())
 
     async def get_user_by_id(self, user_id: int) -> auth.User | None:
-        row = await self._s.get(m.UserModel, user_id)
+        # 2.3 - eager load roles→permissions через selectinload (RBAC всегда нужен целиком)
+        q = (
+            select(m.UserModel)
+            .options(
+                selectinload(m.UserModel.roles).selectinload(m.RoleModel.permissions)
+            )
+            .where(m.UserModel.id == user_id)
+        )
+        row = (await self._s.execute(q)).scalar_one_or_none()
         if row is None:
             return None
         return auth.User(id=row.id, email=row.email)
@@ -72,13 +83,20 @@ class SqlLiftRepository:
         self._s = session
 
     async def get_by_id(self, lift_id: int) -> e.Lift | None:
-        row = await self._s.get(m.LiftModel, lift_id)
+        # 2.3 - eager load sensors при получении одного лифта (часто нужны для проверки)
+        q = (
+            select(m.LiftModel)
+            .options(selectinload(m.LiftModel.sensors))
+            .where(m.LiftModel.id == lift_id)
+        )
+        row = (await self._s.execute(q)).scalar_one_or_none()
         return mappers.lift_to_domain(row) if row else None
 
     async def list_paginated(
         self, owner_id: int | None, offset: int, limit: int
     ) -> tuple[list[e.Lift], int]:
-        base_q = select(m.LiftModel)
+        # 2.3 - eager load sensors через selectinload при пагинации лифтов
+        base_q = select(m.LiftModel).options(selectinload(m.LiftModel.sensors))
         count_q = select(func.count()).select_from(m.LiftModel)
         if owner_id is not None:
             base_q = base_q.where(m.LiftModel.owner_id == owner_id)
@@ -251,7 +269,13 @@ class SqlServiceRequestRepository:
         self._s = session
 
     async def get_by_id(self, request_id: int) -> e.ServiceRequest | None:
-        row = await self._s.get(m.ServiceRequestModel, request_id)
+        # 2.3 - eager load technician через joinedload (связь один-к-одному)
+        q = (
+            select(m.ServiceRequestModel)
+            .options(joinedload(m.ServiceRequestModel.technician))
+            .where(m.ServiceRequestModel.id == request_id)
+        )
+        row = (await self._s.execute(q)).scalar_one_or_none()
         return mappers.service_request_to_domain(row) if row else None
 
     async def list_filtered(
@@ -273,13 +297,14 @@ class SqlServiceRequestRepository:
         if filters:
             count_q = count_q.where(*filters)
         total = (await self._s.execute(count_q)).scalar_one()
-        q = select(m.ServiceRequestModel)
+        # 2.3 - eager load technician через joinedload при фильтрации заявок
+        q = select(m.ServiceRequestModel).options(joinedload(m.ServiceRequestModel.technician))
         if filters:
             q = q.where(*filters)
         result = await self._s.execute(
             q.order_by(m.ServiceRequestModel.id.desc()).offset(offset).limit(limit)
         )
-        rows = result.scalars().all()
+        rows = result.unique().scalars().all()
         return [mappers.service_request_to_domain(r) for r in rows], int(total)
 
     async def create(self, req: e.ServiceRequest) -> e.ServiceRequest:

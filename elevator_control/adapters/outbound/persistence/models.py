@@ -1,9 +1,17 @@
+# 2.3 - Оптимизация ORM: lazy и eager loading
+# Стратегии загрузки связей разделены на lazy ("select") и eager ("selectin").
+# lazy="select" — связь загружается только при обращении (по умолчанию, экономит ресурсы).
+# lazy="selectin" — связь загружается сразу вместе с родителем (eager, используется
+#   для связей, которые нужны практически в каждом запросе, например roles -> permissions).
+# В репозиториях при необходимости подгрузки используются options(selectinload(...)).
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from elevator_control.infrastructure.database import Base
+
 
 
 user_roles = Table(
@@ -83,11 +91,13 @@ class LiftModel(Base):
     location: Mapped[str] = mapped_column(String(256), nullable=False)
     is_emergency: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    sensors: Mapped[list["SensorModel"]] = relationship(back_populates="lift", cascade="all, delete-orphan")
-    events: Mapped[list["EventModel"]] = relationship(back_populates="lift", cascade="all, delete-orphan")
+    # 2.3 - lazy="select": owner загружается только при обращении
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    # 2.3 - lazy="select": коллекции загружаются лениво, т.к. списки потенциально большие
+    sensors: Mapped[list["SensorModel"]] = relationship(back_populates="lift", cascade="all, delete-orphan", lazy="select")
+    events: Mapped[list["EventModel"]] = relationship(back_populates="lift", cascade="all, delete-orphan", lazy="select")
     service_requests: Mapped[list["ServiceRequestModel"]] = relationship(
-        back_populates="lift", cascade="all, delete-orphan"
+        back_populates="lift", cascade="all, delete-orphan", lazy="select"
     )
 
 
@@ -105,8 +115,9 @@ class SensorModel(Base):
     current_value: Mapped[float] = mapped_column(Float, nullable=False)
     threshold_norm: Mapped[float] = mapped_column(Float, nullable=False)
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    lift: Mapped["LiftModel"] = relationship(back_populates="sensors")
+    # 2.3 - lazy="select": owner и lift загружаются только при необходимости
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    lift: Mapped["LiftModel"] = relationship(back_populates="sensors", lazy="select")
 
 
 class EventModel(Base):
@@ -123,8 +134,9 @@ class EventModel(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    lift: Mapped["LiftModel"] = relationship(back_populates="events")
+    # 2.3 - lazy="select": owner и lift загружаются только при необходимости
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    lift: Mapped["LiftModel"] = relationship(back_populates="events", lazy="select")
 
 
 class TechnicianModel(Base):
@@ -139,8 +151,9 @@ class TechnicianModel(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    service_requests: Mapped[list["ServiceRequestModel"]] = relationship(back_populates="technician")
+    # 2.3 - lazy="select": owner загружается лениво
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    service_requests: Mapped[list["ServiceRequestModel"]] = relationship(back_populates="technician", lazy="select")
 
 
 class ServiceRequestModel(Base):
@@ -159,10 +172,11 @@ class ServiceRequestModel(Base):
         ForeignKey("technicians.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    lift: Mapped["LiftModel"] = relationship(back_populates="service_requests")
-    technician: Mapped["TechnicianModel | None"] = relationship(back_populates="service_requests")
-    reports: Mapped[list["ReportModel"]] = relationship(back_populates="service_request", cascade="all, delete-orphan")
+    # 2.3 - lazy="select": связи загружаются лениво; eager подгрузка выполняется в репозиториях
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    lift: Mapped["LiftModel"] = relationship(back_populates="service_requests", lazy="select")
+    technician: Mapped["TechnicianModel | None"] = relationship(back_populates="service_requests", lazy="select")
+    reports: Mapped[list["ReportModel"]] = relationship(back_populates="service_request", cascade="all, delete-orphan", lazy="select")
 
 
 class ReportModel(Base):
@@ -181,5 +195,6 @@ class ReportModel(Base):
     final_lift_status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    owner: Mapped[UserModel] = relationship(lazy="selectin")
-    service_request: Mapped["ServiceRequestModel"] = relationship(back_populates="reports")
+    # 2.3 - lazy="select": owner загружается лениво
+    owner: Mapped[UserModel] = relationship(lazy="select")
+    service_request: Mapped["ServiceRequestModel"] = relationship(back_populates="reports", lazy="select")
