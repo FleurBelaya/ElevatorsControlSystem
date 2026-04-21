@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "CHANGE_ME"
     access_token_ttl_seconds: int = 60 * 60
 
+    # 2.5.2 - Интеграция очереди: настройки Celery + Redis
+    celery_broker_url: str = "redis://localhost:6379/0"
+    celery_result_backend: str = "redis://localhost:6379/0"
+
     @property
     def database_url_async(self) -> str:
         """URL для SQLAlchemy AsyncEngine (драйвер asyncpg)."""
