@@ -6,10 +6,12 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import text
 
@@ -133,3 +135,29 @@ async def forbidden_handler(_request: Request, exc: ForbiddenError) -> JSONRespo
 
 
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# 3.1 Единый Backend API:
+# Бэкенд является единственным источником истины и обслуживает ВСЕХ клиентов. Клиенты здесь — статические страницы,
+# но они используют один и тот же API по /api/v1 и не содержат локальной логики данных (только рендеринг + вызовы API).
+_clients_dir = Path(__file__).resolve().parent / "adapters" / "inbound" / "web_clients"
+if _clients_dir.exists():
+    app.mount("/clients", StaticFiles(directory=str(_clients_dir), html=True), name="clients")
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    # 3.1 Единый Backend API: один входной URL сервера для API и клиентов.
+    return RedirectResponse(url="/clients/", status_code=307)
+
+
+@app.get("/clients", include_in_schema=False)
+async def clients_index_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/clients/", status_code=307)
+
+
+@app.get("/clients/", include_in_schema=False)
+async def clients_index() -> HTMLResponse:
+    index_path = _clients_dir / "index.html"
+    if not index_path.exists():
+        return HTMLResponse("<h1>Clients not found</h1>", status_code=404)
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))

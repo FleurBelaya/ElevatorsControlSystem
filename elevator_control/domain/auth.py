@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class User:
     id: int
     email: str
+    roles: list[str]
 
 
 @dataclass(slots=True)

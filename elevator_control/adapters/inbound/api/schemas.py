@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -202,6 +203,17 @@ class UserRegister(BaseModel):
     email: str = Field(..., max_length=320)
     password: str = Field(..., min_length=8, max_length=256)
 
+    # 3.2 Разные клиенты — разные сценарии:
+    # разрешаем регистрировать пользователей с разными ролями, чтобы у каждого клиента был свой UI/сценарий работы.
+    role: Literal["dispatcher", "technician", "administrator"] = "dispatcher"
+    admin_code: str | None = Field(
+        default=None,
+        max_length=128,
+        description=(
+            "Optional admin registration code (required if you register as administrator and you are not the first user)."
+        ),
+    )
+
 
 class UserLogin(BaseModel):
     # 2.1 Авторизация RBAC
@@ -219,3 +231,4 @@ class UserRead(BaseModel):
     # 2.1 Авторизация RBAC
     id: int
     email: str
+    roles: list[str] = []

@@ -31,7 +31,7 @@ class SqlAuthRepository:
         row = (await self._s.execute(q)).scalar_one_or_none()
         if row is None:
             return None
-        return auth.User(id=row.id, email=row.email)
+        return auth.User(id=row.id, email=row.email, roles=[r.name for r in row.roles])
 
     async def get_user_credentials_by_email(self, email: str) -> auth.UserCredentials | None:
         row = (
@@ -50,7 +50,7 @@ class SqlAuthRepository:
         row = m.UserModel(email=email, password_hash=password_hash, is_active=True)
         self._s.add(row)
         await self._s.flush()
-        return auth.User(id=row.id, email=row.email)
+        return auth.User(id=row.id, email=row.email, roles=[])
 
     async def assign_role_to_user(self, user_id: int, role_name: str) -> None:
         user = await self._s.get(m.UserModel, user_id)

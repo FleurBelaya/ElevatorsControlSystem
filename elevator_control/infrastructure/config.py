@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,10 @@ class Settings(BaseSettings):
     # 2.1 Авторизация RBAC
     jwt_secret_key: str = "CHANGE_ME"
     access_token_ttl_seconds: int = 60 * 60
+
+    # 3.2 Разные клиенты — разные сценарии (MVP):
+    # общий код, чтобы разрешить регистрацию дополнительных аккаунтов администратора.
+    registration_admin_code: str | None = Field(default=None, validation_alias="ELEVATOR_REGISTRATION_ADMIN_CODE")
 
     # 2.5.2 - Интеграция очереди: настройки Celery
     # По умолчанию используется файловый брокер (SQLite/filesystem) — работает

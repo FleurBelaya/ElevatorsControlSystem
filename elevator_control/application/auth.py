@@ -121,22 +121,49 @@ class AuthApplicationService:
         access_token_ttl_seconds: int,
         admin_role_name: str = "administrator",
         default_role_name: str = "dispatcher",
+        registration_admin_code: str | None = None,
     ) -> None:
         self._repo = repo
         self._jwt_secret_key = jwt_secret_key
         self._access_token_ttl_seconds = access_token_ttl_seconds
         self._admin_role_name = admin_role_name
         self._default_role_name = default_role_name
+        self._registration_admin_code = registration_admin_code
 
-    async def register(self, email: str, password: str) -> domain_auth.User:
+    async def register(
+        self,
+        email: str,
+        password: str,
+        *,
+        role: str | None = None,
+        admin_code: str | None = None,
+    ) -> domain_auth.User:
+        # 3.2 Разные клиенты — разные сценарии:
+        # регистрация с учетом роли (dispatcher/technician/administrator).
         existing = await self._repo.get_user_credentials_by_email(email)
         if existing is not None:
             raise ConflictError("Пользователь уже существует")
         user = await self._repo.create_user(email, hash_password(password))
         is_first = (await self._repo.count_users()) == 1
-        role = self._admin_role_name if is_first else self._default_role_name
-        await self._repo.assign_role_to_user(user.id, role)
-        return user
+
+        resolved_role = self._admin_role_name if is_first else (role or self._default_role_name)
+        allowed_roles = {self._default_role_name, "technician", self._admin_role_name}
+        if resolved_role not in allowed_roles:
+            raise ConflictError("Unknown role")
+
+        # 3.2 Разные клиенты — разные сценарии (MVP-безопасность):
+        # администратора можно зарегистрировать только если это первый пользователь ИЛИ если указан общий код.
+        if resolved_role == self._admin_role_name and not is_first:
+            expected = self._registration_admin_code
+            if expected is None:
+                expected = os.getenv("ELEVATOR_REGISTRATION_ADMIN_CODE") or os.getenv("REGISTRATION_ADMIN_CODE")
+            if expected is None or admin_code != expected:
+                raise ForbiddenError("Admin registration is not allowed")
+
+        await self._repo.assign_role_to_user(user.id, resolved_role)
+        refreshed = await self._repo.get_user_by_id(user.id)
+        assert refreshed is not None
+        return refreshed
 
     async def login(self, email: str, password: str) -> TokenPair:
         user = await self._repo.get_user_credentials_by_email(email)

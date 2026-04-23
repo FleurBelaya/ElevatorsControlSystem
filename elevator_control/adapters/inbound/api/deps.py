@@ -34,6 +34,7 @@ def get_auth_service(session: SessionDep) -> AuthApplicationService:
         get_auth_repo(session),
         jwt_secret_key=settings.jwt_secret_key,
         access_token_ttl_seconds=settings.access_token_ttl_seconds,
+        registration_admin_code=settings.registration_admin_code,
     )
 
 
