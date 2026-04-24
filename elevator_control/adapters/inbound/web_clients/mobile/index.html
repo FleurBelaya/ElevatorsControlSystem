@@ -1,0 +1,565 @@
+<!--
+    3.1 - Единый бэкенд API: мобильный клиент использует тот же единый API (/api/v1),
+          что и веб- и десктоп-клиенты. Нет локальной логики данных.
+    3.2 - Разные клиенты — разные сценарии: мобильный интерфейс отличается от веб-клиента:
+          карточки вместо таблиц, нижняя навигация (bottom tab bar), FAB-кнопка,
+          bottom-sheet модалки. Роли определяют доступные разделы и действия.
+    3.3 - Синхронизация данных: polling каждые 10 сек через API.
+          Изменения с веба/десктопа видны здесь и наоборот.
+    3.4 - Обработка ошибок: toast-уведомления при ошибках API.
+-->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Лифты — Мобильный клиент</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; font-size: 15px; }
+
+        /* --- Auth --- */
+        .auth-wrap { padding: 40px 20px 20px; max-width: 400px; margin: 0 auto; }
+        .auth-wrap h1 { text-align: center; font-size: 20px; margin-bottom: 8px; }
+        .auth-wrap p { text-align: center; font-size: 12px; color: #999; margin-bottom: 24px; }
+        .field { width: 100%; padding: 14px 16px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 12px; font-size: 15px; background: #fff; }
+        .btn-full { width: 100%; padding: 14px; background: #2563eb; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-full:active { background: #1d4ed8; }
+        .link { text-align: center; margin-top: 16px; font-size: 13px; }
+        .link a { color: #2563eb; text-decoration: underline; cursor: pointer; }
+        #m-admin-code-group { display: none; }
+
+        /* --- Top bar --- */
+        .topbar { position: sticky; top: 0; z-index: 50; background: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
+        .topbar h2 { font-size: 16px; }
+        .topbar .role-badge { font-size: 11px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 10px; }
+        .topbar button { background: none; border: none; color: #ef4444; font-size: 13px; cursor: pointer; font-weight: 600; }
+
+        /* --- Bottom nav --- */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #eee; display: flex; z-index: 50; padding-bottom: env(safe-area-inset-bottom); }
+        .bottom-nav a { flex: 1; text-align: center; padding: 10px 0 8px; font-size: 11px; color: #999; text-decoration: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .bottom-nav a.active { color: #2563eb; }
+        .bottom-nav a .icon { font-size: 20px; line-height: 1; }
+
+        /* --- Content --- */
+        .page { padding: 12px 16px 80px; }
+
+        /* --- Cards --- */
+        .card { background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .card-title { font-weight: 600; font-size: 15px; }
+        .card-row { display: flex; justify-content: space-between; font-size: 13px; color: #666; padding: 3px 0; }
+        .card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .btn-card { padding: 8px 14px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+        .btn-blue { background: #2563eb; color: #fff; }
+        .btn-blue:active { background: #1d4ed8; }
+        .btn-red { background: #fee2e2; color: #dc2626; }
+        .btn-green { background: #dcfce7; color: #16a34a; }
+        .btn-orange { background: #fef3c7; color: #92400e; }
+
+        /* --- Badges --- */
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+        .b-active { background: #dcfce7; color: #166534; }
+        .b-stopped { background: #fee2e2; color: #991b1b; }
+        .b-maintenance { background: #fef3c7; color: #92400e; }
+        .b-warning { background: #fef3c7; color: #92400e; }
+        .b-critical { background: #fee2e2; color: #991b1b; }
+        .b-new { background: #dbeafe; color: #1e40af; }
+        .b-in_progress { background: #fef3c7; color: #92400e; }
+        .b-resolved { background: #dcfce7; color: #166534; }
+        .b-pending { background: #f3e8ff; color: #6b21a8; }
+        .b-assigned { background: #dbeafe; color: #1e40af; }
+        .b-completed { background: #dcfce7; color: #166534; }
+        .b-cancelled { background: #f5f5f5; color: #666; }
+        .b-free { background: #dcfce7; color: #166534; }
+        .b-busy { background: #fee2e2; color: #991b1b; }
+        .emergency-flag { color: #dc2626; font-weight: 700; font-size: 12px; }
+
+        /* --- Modal --- */
+        .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; justify-content: center; align-items: flex-end; }
+        .modal-bg.show { display: flex; }
+        .modal-sheet { background: #fff; width: 100%; max-width: 500px; border-radius: 16px 16px 0 0; padding: 20px 16px 30px; max-height: 85vh; overflow-y: auto; }
+        .modal-sheet h3 { margin-bottom: 16px; font-size: 17px; }
+        .modal-sheet label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+        .modal-sheet input, .modal-sheet select, .modal-sheet textarea { width: 100%; padding: 12px 14px; border: 1px solid #e0e0e0; border-radius: 10px; font-size: 15px; background: #fafafa; }
+        .modal-sheet textarea { min-height: 70px; resize: vertical; }
+        .modal-actions { margin-top: 16px; display: flex; gap: 8px; }
+        .modal-actions button { flex: 1; }
+
+        /* --- Toast --- */
+        .toast { position: fixed; top: 12px; left: 12px; right: 12px; padding: 14px 16px; border-radius: 12px; font-size: 14px; z-index: 200; display: none; text-align: center; }
+        .toast.show { display: block; }
+        .toast-error { background: #fee2e2; color: #991b1b; }
+        .toast-ok { background: #dcfce7; color: #166534; }
+
+        .section-title { font-size: 13px; color: #999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .empty { text-align: center; padding: 30px; color: #aaa; font-size: 14px; }
+        .fab { position: fixed; bottom: 72px; right: 16px; width: 52px; height: 52px; border-radius: 50%; background: #2563eb; color: #fff; border: none; font-size: 26px; box-shadow: 0 4px 12px rgba(37,99,235,0.4); cursor: pointer; z-index: 40; }
+        .fab:active { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="m-auth">
+    <div class="auth-wrap">
+        <h1>Управление лифтами</h1>
+        <p>Мобильный клиент</p>
+        <div id="m-login-form">
+            <input class="field" type="email" id="ml-email" placeholder="Email">
+            <input class="field" type="password" id="ml-pass" placeholder="Пароль">
+            <button class="btn-full" onclick="mLogin()">Войти</button>
+            <div class="link"><a onclick="mShowReg()">Создать аккаунт</a></div>
+        </div>
+        <div id="m-reg-form" style="display:none">
+            <input class="field" type="email" id="mr-email" placeholder="Email">
+            <input class="field" type="password" id="mr-pass" placeholder="Пароль (мин. 8)">
+            <select class="field" id="mr-role" onchange="mToggleAdmin()">
+                <option value="dispatcher">Диспетчер</option>
+                <option value="technician">Техник</option>
+                <option value="administrator">Администратор</option>
+            </select>
+            <div id="m-admin-code-group"><input class="field" id="mr-acode" placeholder="Код администратора"></div>
+            <button class="btn-full" onclick="mRegister()">Зарегистрироваться</button>
+            <div class="link"><a onclick="mShowLogin()">Уже есть аккаунт</a></div>
+        </div>
+    </div>
+</div>
+
+<!-- 3.2 - Разные клиенты: мобильный интерфейс с bottom-nav и карточками -->
+<div id="m-app" style="display:none">
+    <div class="topbar">
+        <div>
+            <h2 id="m-page-title">Лифты</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="role-badge" id="m-role-badge"></span>
+            <button onclick="mLogout()">Выйти</button>
+        </div>
+    </div>
+    <div class="page" id="m-content"></div>
+    <button class="fab" id="m-fab" onclick="mFabAction()" style="display:none">+</button>
+    <nav class="bottom-nav" id="m-nav"></nav>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="m-modal" onclick="if(event.target===this)mCloseModal()">
+    <div class="modal-sheet" id="m-modal-body"></div>
+</div>
+
+<!-- 3.4 - Обработка ошибок: toast-уведомления для мобильного клиента -->
+<div class="toast" id="m-toast"></div>
+
+<script>
+// 3.1 - Единый бэкенд API: мобильный клиент использует тот же API что и веб/десктоп
+const API = '/api/v1';
+let tk = localStorage.getItem('m_token');
+let me = null;
+let curTab = 'lifts';
+let refreshTimer = null;
+
+async function api(method, path, body) {
+    const h = {};
+    if (tk) h['Authorization'] = 'Bearer ' + tk;
+    if (body !== undefined) h['Content-Type'] = 'application/json';
+    const r = await fetch(API + path, { method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined });
+    if (r.status === 204) return null;
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Ошибка ' + r.status); // 3.4 - Обработка ошибок
+    return d;
+}
+
+// 3.4 - Обработка ошибок: toast-уведомления для пользователя
+function toast(msg, ok) {
+    const t = document.getElementById('m-toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (ok ? 'toast-ok' : 'toast-error');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.className = 'toast', 3500);
+}
+
+function bg(v) {
+    const l = { active:'Активен', stopped:'Остановлен', maintenance:'Обслуж.', warning:'Предупр.', critical:'Критич.',
+        new:'Новое', in_progress:'В работе', resolved:'Решено', pending:'Ожидает', assigned:'Назначена',
+        completed:'Завершена', cancelled:'Отменена', free:'Свободен', busy:'Занят' };
+    return `<span class="badge b-${v}">${l[v]||v}</span>`;
+}
+
+// 3.2 - Разные клиенты — разные сценарии: проверка роли для отображения элементов
+function has(r) { return me && me.roles.includes(r); }
+
+// AUTH
+function mShowReg() { document.getElementById('m-login-form').style.display='none'; document.getElementById('m-reg-form').style.display=''; }
+function mShowLogin() { document.getElementById('m-login-form').style.display=''; document.getElementById('m-reg-form').style.display='none'; }
+function mToggleAdmin() { document.getElementById('m-admin-code-group').style.display = document.getElementById('mr-role').value==='administrator' ? '' : 'none'; }
+
+async function mLogin() {
+    try {
+        const d = await api('POST', '/auth/login-json', { email: document.getElementById('ml-email').value, password: document.getElementById('ml-pass').value });
+        tk = d.access_token; localStorage.setItem('m_token', tk); await mInit();
+    } catch(e) { toast(e.message); }
+}
+
+async function mRegister() {
+    try {
+        const b = { email: document.getElementById('mr-email').value, password: document.getElementById('mr-pass').value, role: document.getElementById('mr-role').value };
+        if (b.role==='administrator') b.admin_code = document.getElementById('mr-acode').value;
+        await api('POST', '/auth/register', b);
+        toast('Аккаунт создан! Войдите.', true); mShowLogin();
+    } catch(e) { toast(e.message); }
+}
+
+function mLogout() { tk=null; me=null; localStorage.removeItem('m_token'); stopRefresh(); document.getElementById('m-app').style.display='none'; document.getElementById('m-auth').style.display=''; }
+
+// 3.2 - Разные сценарии: навигация зависит от роли — каждая роль видит свои вкладки
+const tabs = [
+    { id:'lifts', label:'Лифты', icon:'🏢', title:'Лифты', roles:['dispatcher','administrator'] },
+    { id:'events', label:'Инциденты', icon:'⚠️', title:'Инциденты', roles:['dispatcher','technician','administrator'] },
+    { id:'requests', label:'Заявки', icon:'📋', title:'Заявки', roles:['dispatcher','technician','administrator'] },
+    { id:'technicians', label:'Техники', icon:'🔧', title:'Техники', roles:['dispatcher','administrator'] },
+    { id:'reports', label:'Отчёты', icon:'📄', title:'Отчёты', roles:['dispatcher','technician','administrator'] },
+];
+
+function buildNav() {
+    const n = document.getElementById('m-nav');
+    n.innerHTML = tabs.filter(t => t.roles.some(r => has(r))).map(t =>
+        `<a onclick="switchTab('${t.id}')" id="mn-${t.id}" class="${t.id===curTab?'active':''}"><span class="icon">${t.icon}</span>${t.label}</a>`
+    ).join('');
+}
+
+function switchTab(id) {
+    curTab = id;
+    document.querySelectorAll('.bottom-nav a').forEach(a => a.classList.remove('active'));
+    const el = document.getElementById('mn-'+id);
+    if (el) el.classList.add('active');
+    const tab = tabs.find(t=>t.id===id);
+    document.getElementById('m-page-title').textContent = tab ? tab.title : '';
+    loadTab();
+}
+
+function loadTab() {
+    const loaders = { lifts: mLifts, events: mEvents, requests: mRequests, technicians: mTechs, reports: mReports };
+    (loaders[curTab]||mLifts)();
+    updateFab();
+}
+
+function updateFab() {
+    const fab = document.getElementById('m-fab');
+    const canAdd = {
+        lifts: has('dispatcher')||has('administrator'),
+        events: has('dispatcher')||has('administrator'),
+        requests: has('dispatcher')||has('administrator'),
+        technicians: has('dispatcher')||has('administrator'),
+        reports: has('technician')||has('administrator')||has('dispatcher'),
+    };
+    fab.style.display = canAdd[curTab] ? '' : 'none';
+}
+
+function mFabAction() {
+    const actions = { lifts: mAddLift, events: mAddEvent, requests: mAddReq, technicians: mAddTech, reports: mAddReport };
+    (actions[curTab]||mAddLift)();
+}
+
+// 3.3 - Синхронизация данных: автообновление каждые 10 сек, изменения из веба/десктопа видны здесь
+function startRefresh() { stopRefresh(); refreshTimer = setInterval(() => loadTab(), 10000); }
+function stopRefresh() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
+
+// MODAL
+function mOpenModal(html) { document.getElementById('m-modal-body').innerHTML = html; document.getElementById('m-modal').classList.add('show'); }
+function mCloseModal() { document.getElementById('m-modal').classList.remove('show'); }
+
+// ==================== LIFTS ====================
+async function mLifts() {
+    const c = document.getElementById('m-content');
+    try {
+        const d = await api('GET', '/lifts?limit=100');
+        if (!d.items.length) { c.innerHTML = '<div class="empty">Нет лифтов</div>'; return; }
+        c.innerHTML = d.items.map(l => {
+            let acts = '';
+            if (has('dispatcher')||has('administrator')) {
+                acts += `<button class="btn-card btn-blue" onclick="mEditLift(${l.id})">Изменить</button>`;
+                if (l.is_emergency) acts += `<button class="btn-card btn-green" onclick="mRestoreLift(${l.id})">Восстановить</button>`;
+                acts += `<button class="btn-card btn-orange" onclick="mEmergency(${l.id})">Авария</button>`;
+            }
+            if (has('administrator')) acts += `<button class="btn-card btn-red" onclick="mDelLift(${l.id})">Удалить</button>`;
+            return `<div class="card">
+                <div class="card-header"><span class="card-title">${l.model}</span>${bg(l.status)}</div>
+                <div class="card-row"><span>ID</span><span>#${l.id}</span></div>
+                <div class="card-row"><span>Расположение</span><span>${l.location}</span></div>
+                <div class="card-row"><span>Авария</span><span>${l.is_emergency ? '<span class="emergency-flag">АВАРИЯ</span>' : 'Нет'}</span></div>
+                ${acts ? `<div class="card-actions">${acts}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { c.innerHTML = `<div class="empty">${e.message}</div>`; toast(e.message); }
+}
+
+function mAddLift() {
+    mOpenModal(`<h3>Новый лифт</h3>
+        <label>Модель</label><input id="mm-model">
+        <label>Расположение</label><input id="mm-loc">
+        <label>Статус</label><select id="mm-st"><option value="active">Активен</option><option value="stopped">Остановлен</option><option value="maintenance">Обслуживание</option></select>
+        <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mSaveLift()">Создать</button></div>`);
+}
+
+async function mSaveLift() {
+    try { await api('POST', '/lifts', { model:document.getElementById('mm-model').value, location:document.getElementById('mm-loc').value, status:document.getElementById('mm-st').value }); mCloseModal(); toast('Лифт добавлен',true); mLifts(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mEditLift(id) {
+    try {
+        const l = await api('GET', `/lifts/${id}`);
+        mOpenModal(`<h3>Лифт #${id}</h3>
+            <label>Модель</label><input id="mm-model" value="${l.model}">
+            <label>Расположение</label><input id="mm-loc" value="${l.location}">
+            <label>Статус</label><select id="mm-st"><option value="active" ${l.status==='active'?'selected':''}>Активен</option><option value="stopped" ${l.status==='stopped'?'selected':''}>Остановлен</option><option value="maintenance" ${l.status==='maintenance'?'selected':''}>Обслуживание</option></select>
+            <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mUpdLift(${id})">Сохранить</button></div>`);
+    } catch(e) { toast(e.message); }
+}
+
+async function mUpdLift(id) {
+    try { await api('PATCH', `/lifts/${id}`, { model:document.getElementById('mm-model').value, location:document.getElementById('mm-loc').value, status:document.getElementById('mm-st').value }); mCloseModal(); toast('Обновлено',true); mLifts(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mDelLift(id) {
+    if (!confirm('Удалить лифт #'+id+'?')) return;
+    try { await api('DELETE', `/lifts/${id}`); toast('Удалено',true); mLifts(); } catch(e) { toast(e.message); }
+}
+
+async function mRestoreLift(id) {
+    try { await api('POST', `/lifts/${id}/restore-state`, {}); toast('Восстановлено',true); mLifts(); } catch(e) { toast(e.message); }
+}
+
+async function mEmergency(id) {
+    if (!confirm('Симулировать аварию?')) return;
+    try { await api('POST', `/lifts/${id}/simulate-critical-emergency`, {}); toast('Авария симулирована',true); mLifts(); } catch(e) { toast(e.message); }
+}
+
+// ==================== EVENTS ====================
+async function mEvents() {
+    const c = document.getElementById('m-content');
+    try {
+        const d = await api('GET', '/events?limit=100');
+        if (!d.items.length) { c.innerHTML = '<div class="empty">Нет инцидентов</div>'; return; }
+        c.innerHTML = d.items.map(e => {
+            let acts = '';
+            if (has('dispatcher')||has('administrator')) acts = `<button class="btn-card btn-blue" onclick="mEditEv(${e.id})">Изменить</button>`;
+            return `<div class="card">
+                <div class="card-header"><span class="card-title">Инцидент #${e.id}</span>${bg(e.event_type)}</div>
+                <div class="card-row"><span>Лифт</span><span>#${e.lift_id}</span></div>
+                <div class="card-row"><span>Статус</span><span>${bg(e.status)}</span></div>
+                <div style="font-size:13px;color:#666;margin-top:4px;">${e.description}</div>
+                ${acts ? `<div class="card-actions">${acts}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { c.innerHTML = `<div class="empty">${e.message}</div>`; toast(e.message); }
+}
+
+function mAddEvent() {
+    mOpenModal(`<h3>Новый инцидент</h3>
+        <label>ID лифта</label><input id="mm-elift" type="number">
+        <label>Тип</label><select id="mm-etype"><option value="warning">Предупреждение</option><option value="critical">Критический</option></select>
+        <label>Описание</label><textarea id="mm-edesc"></textarea>
+        <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mSaveEv()">Создать</button></div>`);
+}
+
+async function mSaveEv() {
+    try { await api('POST', '/events', { lift_id:+document.getElementById('mm-elift').value, event_type:document.getElementById('mm-etype').value, description:document.getElementById('mm-edesc').value }); mCloseModal(); toast('Создано',true); mEvents(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mEditEv(id) {
+    try {
+        const ev = await api('GET', `/events/${id}`);
+        mOpenModal(`<h3>Инцидент #${id}</h3>
+            <label>Статус</label><select id="mm-est"><option value="new" ${ev.status==='new'?'selected':''}>Новое</option><option value="in_progress" ${ev.status==='in_progress'?'selected':''}>В работе</option><option value="resolved" ${ev.status==='resolved'?'selected':''}>Решено</option></select>
+            <label>Описание</label><textarea id="mm-edesc">${ev.description}</textarea>
+            <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mUpdEv(${id})">Сохранить</button></div>`);
+    } catch(e) { toast(e.message); }
+}
+
+async function mUpdEv(id) {
+    try { await api('PATCH', `/events/${id}`, { status:document.getElementById('mm-est').value, description:document.getElementById('mm-edesc').value }); mCloseModal(); toast('Обновлено',true); mEvents(); }
+    catch(e) { toast(e.message); }
+}
+
+// ==================== REQUESTS ====================
+async function mRequests() {
+    const c = document.getElementById('m-content');
+    try {
+        const d = await api('GET', '/service-requests?limit=100');
+        if (!d.items.length) { c.innerHTML = '<div class="empty">Нет заявок</div>'; return; }
+        c.innerHTML = d.items.map(r => {
+            let acts = '';
+            if (has('dispatcher')||has('administrator')||has('technician'))
+                acts += `<button class="btn-card btn-blue" onclick="mEditReq(${r.id})">Изменить</button>`;
+            if (has('administrator'))
+                acts += `<button class="btn-card btn-red" onclick="mDelReq(${r.id})">Удалить</button>`;
+            return `<div class="card">
+                <div class="card-header"><span class="card-title">Заявка #${r.id}</span>${bg(r.status)}</div>
+                <div class="card-row"><span>Лифт</span><span>#${r.lift_id}</span></div>
+                <div class="card-row"><span>Техник</span><span>${r.technician_id || '—'}</span></div>
+                <div style="font-size:13px;color:#666;margin-top:4px;">${r.reason}</div>
+                ${acts ? `<div class="card-actions">${acts}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { c.innerHTML = `<div class="empty">${e.message}</div>`; toast(e.message); }
+}
+
+function mAddReq() {
+    mOpenModal(`<h3>Новая заявка</h3>
+        <label>ID лифта</label><input id="mm-rlift" type="number">
+        <label>Причина</label><textarea id="mm-rreason"></textarea>
+        <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mSaveReq()">Создать</button></div>`);
+}
+
+async function mSaveReq() {
+    try { await api('POST', '/service-requests', { lift_id:+document.getElementById('mm-rlift').value, reason:document.getElementById('mm-rreason').value }); mCloseModal(); toast('Создано',true); mRequests(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mEditReq(id) {
+    try {
+        const r = await api('GET', `/service-requests/${id}`);
+        mOpenModal(`<h3>Заявка #${id}</h3>
+            <label>Статус</label><select id="mm-rst"><option value="pending" ${r.status==='pending'?'selected':''}>Ожидает</option><option value="assigned" ${r.status==='assigned'?'selected':''}>Назначена</option><option value="in_progress" ${r.status==='in_progress'?'selected':''}>В работе</option><option value="completed" ${r.status==='completed'?'selected':''}>Завершена</option><option value="cancelled" ${r.status==='cancelled'?'selected':''}>Отменена</option></select>
+            <label>ID техника</label><input id="mm-rtech" type="number" value="${r.technician_id||''}">
+            <label>Причина</label><textarea id="mm-rreason">${r.reason}</textarea>
+            <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mUpdReq(${id})">Сохранить</button></div>`);
+    } catch(e) { toast(e.message); }
+}
+
+async function mUpdReq(id) {
+    try {
+        const b = { status:document.getElementById('mm-rst').value, reason:document.getElementById('mm-rreason').value };
+        const tv = document.getElementById('mm-rtech').value;
+        if (tv) b.technician_id = +tv;
+        await api('PATCH', `/service-requests/${id}`, b); mCloseModal(); toast('Обновлено',true); mRequests();
+    } catch(e) { toast(e.message); }
+}
+
+async function mDelReq(id) {
+    if (!confirm('Удалить?')) return;
+    try { await api('DELETE', `/service-requests/${id}`); toast('Удалено',true); mRequests(); } catch(e) { toast(e.message); }
+}
+
+// ==================== TECHNICIANS ====================
+async function mTechs() {
+    const c = document.getElementById('m-content');
+    try {
+        const d = await api('GET', '/technicians?limit=100');
+        if (!d.items.length) { c.innerHTML = '<div class="empty">Нет техников</div>'; return; }
+        c.innerHTML = d.items.map(t => {
+            let acts = '';
+            if (has('dispatcher')||has('administrator'))
+                acts += `<button class="btn-card btn-blue" onclick="mEditTech(${t.id})">Изменить</button>`;
+            if (has('administrator'))
+                acts += `<button class="btn-card btn-red" onclick="mDelTech(${t.id})">Удалить</button>`;
+            return `<div class="card">
+                <div class="card-header"><span class="card-title">${t.name}</span>${bg(t.status)}</div>
+                <div class="card-row"><span>ID</span><span>#${t.id}</span></div>
+                ${acts ? `<div class="card-actions">${acts}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { c.innerHTML = `<div class="empty">${e.message}</div>`; toast(e.message); }
+}
+
+function mAddTech() {
+    mOpenModal(`<h3>Новый техник</h3>
+        <label>ФИО</label><input id="mm-tname">
+        <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mSaveTech()">Создать</button></div>`);
+}
+
+async function mSaveTech() {
+    try { await api('POST', '/technicians', { name:document.getElementById('mm-tname').value }); mCloseModal(); toast('Создано',true); mTechs(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mEditTech(id) {
+    try {
+        const t = await api('GET', `/technicians/${id}`);
+        mOpenModal(`<h3>Техник #${id}</h3>
+            <label>ФИО</label><input id="mm-tname" value="${t.name}">
+            <label>Статус</label><select id="mm-tst"><option value="free" ${t.status==='free'?'selected':''}>Свободен</option><option value="busy" ${t.status==='busy'?'selected':''}>Занят</option></select>
+            <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mUpdTech(${id})">Сохранить</button></div>`);
+    } catch(e) { toast(e.message); }
+}
+
+async function mUpdTech(id) {
+    try { await api('PATCH', `/technicians/${id}`, { name:document.getElementById('mm-tname').value, status:document.getElementById('mm-tst').value }); mCloseModal(); toast('Обновлено',true); mTechs(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mDelTech(id) {
+    if (!confirm('Удалить?')) return;
+    try { await api('DELETE', `/technicians/${id}`); toast('Удалено',true); mTechs(); } catch(e) { toast(e.message); }
+}
+
+// ==================== REPORTS ====================
+async function mReports() {
+    const c = document.getElementById('m-content');
+    try {
+        const d = await api('GET', '/reports?limit=100');
+        if (!d.items.length) { c.innerHTML = '<div class="empty">Нет отчётов</div>'; return; }
+        c.innerHTML = d.items.map(r => {
+            let acts = '';
+            if (has('technician')||has('administrator')||has('dispatcher'))
+                acts = `<button class="btn-card btn-blue" onclick="mEditRep(${r.id})">Изменить</button>`;
+            return `<div class="card">
+                <div class="card-header"><span class="card-title">Отчёт #${r.id}</span>${bg(r.final_lift_status)}</div>
+                <div class="card-row"><span>Заявка</span><span>#${r.service_request_id}</span></div>
+                <div class="card-row"><span>Дата</span><span>${r.created_at ? new Date(r.created_at).toLocaleDateString('ru') : ''}</span></div>
+                <div style="font-size:13px;color:#666;margin-top:4px;">${r.work_description}</div>
+                ${acts ? `<div class="card-actions">${acts}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { c.innerHTML = `<div class="empty">${e.message}</div>`; toast(e.message); }
+}
+
+function mAddReport() {
+    mOpenModal(`<h3>Новый отчёт</h3>
+        <label>ID заявки</label><input id="mm-rrid" type="number">
+        <label>Описание работ</label><textarea id="mm-rrdesc"></textarea>
+        <label>Итоговый статус</label><select id="mm-rrst"><option value="active">Активен</option><option value="stopped">Остановлен</option><option value="maintenance">Обслуживание</option></select>
+        <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mSaveRep()">Создать</button></div>`);
+}
+
+async function mSaveRep() {
+    try { await api('POST', '/reports', { service_request_id:+document.getElementById('mm-rrid').value, work_description:document.getElementById('mm-rrdesc').value, final_lift_status:document.getElementById('mm-rrst').value }); mCloseModal(); toast('Создано',true); mReports(); }
+    catch(e) { toast(e.message); }
+}
+
+async function mEditRep(id) {
+    try {
+        const r = await api('GET', `/reports/${id}`);
+        mOpenModal(`<h3>Отчёт #${id}</h3>
+            <label>Описание работ</label><textarea id="mm-rrdesc">${r.work_description}</textarea>
+            <label>Итоговый статус</label><select id="mm-rrst"><option value="active" ${r.final_lift_status==='active'?'selected':''}>Активен</option><option value="stopped" ${r.final_lift_status==='stopped'?'selected':''}>Остановлен</option><option value="maintenance" ${r.final_lift_status==='maintenance'?'selected':''}>Обслуживание</option></select>
+            <div class="modal-actions"><button class="btn-full" style="background:#ccc;color:#333" onclick="mCloseModal()">Отмена</button><button class="btn-full" onclick="mUpdRep(${id})">Сохранить</button></div>`);
+    } catch(e) { toast(e.message); }
+}
+
+async function mUpdRep(id) {
+    try { await api('PATCH', `/reports/${id}`, { work_description:document.getElementById('mm-rrdesc').value, final_lift_status:document.getElementById('mm-rrst').value }); mCloseModal(); toast('Обновлено',true); mReports(); }
+    catch(e) { toast(e.message); }
+}
+
+// ==================== INIT ====================
+async function mInit() {
+    try { me = await api('GET', '/auth/me'); } catch(e) { mLogout(); return; }
+    document.getElementById('m-auth').style.display = 'none';
+    document.getElementById('m-app').style.display = '';
+    document.getElementById('m-role-badge').textContent = me.roles.join(', ');
+    buildNav();
+    // pick first available tab
+    const available = tabs.filter(t => t.roles.some(r => has(r)));
+    if (available.length && !available.find(t=>t.id===curTab)) curTab = available[0].id;
+    switchTab(curTab);
+    startRefresh();
+}
+
+if (tk) mInit();
+</script>
+</body>
+</html>
