@@ -98,7 +98,7 @@ RATE_LIMIT_BURST_PER_10S=30
 ### 2.3. База данных
 
 ```bash
-# Применить миграции (включая 003 — read-модель + outbox + blacklist).
+# Применить миграции (включая 004 — read-модель + outbox + blacklist).
 alembic upgrade head
 ```
 
@@ -167,7 +167,7 @@ GET-эндпоинты идут через **Query** (raw SQL по read-моде
 ## 4. Где CQRS
 
 - **Разделение Command/Query** — `application/services.py` (CommandService) vs `application/queries/*` (QueryService).
-- **Разные модели данных** — write-таблицы `lifts/events/...` (миграция 001) и read-таблицы `lifts_read/events_read/...` (миграция 003 — `alembic/versions/003_cqrs_read_model.py`).
+- **Разные модели данных** — write-таблицы `lifts/events/...` (миграция 001) и read-таблицы `lifts_read/events_read/...` (миграция 004 — `alembic/versions/003_cqrs_read_model.py`).
 - **Query без ORM** — `application/queries/*.py` используют пул `asyncpg` (`infrastructure/raw_pool.py`); каждый SQL — c prepared-параметрами `$1/$2/...`.
 - **HTTP-edge** — `adapters/inbound/api/v1/*.py`, GET → `*QueryDep`, POST/PATCH/DELETE → `*CmdDep`.
 
