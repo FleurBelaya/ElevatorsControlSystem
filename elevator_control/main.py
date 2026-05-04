@@ -19,6 +19,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from elevator_control.adapters.inbound.api.v1 import api_v1_router
 from elevator_control.adapters.inbound.api.bff import bff_router
 from elevator_control.adapters.outbound.persistence import repositories_impl as impl
+from elevator_control.application import observability
 from elevator_control.application.simulation import run_sensor_simulation_tick
 from elevator_control.domain.exceptions import (
     ConflictError,
@@ -231,6 +232,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.status_code,
             duration_ms,
         )
+        # 5.2.1 Горячие точки: классификация по HTTP-методу.
+        path = request.url.path
+        if path.startswith("/api/") or path.startswith("/bff/"):
+            hp = "query" if request.method == "GET" else "command"
+            observability.record(
+                hp,
+                f"{request.method} {path}",
+                duration_ms,
+                ok=response.status_code < 400,
+            )
         return response
 
 
@@ -260,6 +271,12 @@ async def forbidden_handler(_request: Request, exc: ForbiddenError) -> JSONRespo
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# 5.2.1 Тепловая карта горячих точек / 5.2.2 Метрики: снимок за последние 60 сек.
+@app.get("/metrics")
+async def metrics() -> dict:
+    return observability.snapshot()
 
 
 # 4.1.1 CQRS API v1: содержит все command/query эндпоинты.

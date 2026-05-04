@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, Asyn
 from sqlalchemy.pool import NullPool
 
 from elevator_control.application import read_sync
+from elevator_control.application import observability
 from elevator_control.application.cache import invalidate_for_aggregate
 from elevator_control.infrastructure.celery_app import celery_app
 from elevator_control.infrastructure.config import settings
@@ -58,6 +59,8 @@ def process_domain_event(self, log_id: int) -> dict:
         "5.2.2 metric: worker process_domain_event log_id=%s ok=%s time=%.1fms",
         log_id, result.get("ok"), duration_ms,
     )
+    # 5.2.1 Горячие точки → очередь
+    observability.record("worker", "process_domain_event", duration_ms, ok=bool(result.get("ok")))
     return result
 
 
