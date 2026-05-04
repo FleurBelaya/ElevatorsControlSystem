@@ -39,5 +39,7 @@ celery_app.conf.update(
     result_expires=3600,
 )
 
-# Автообнаружение задач из модуля tasks
+# 4.3.2 Регистрация задач воркера. autodiscover ищет модули с именем `tasks`,
+# поэтому отдельные пакеты с задачами импортируем явно.
 celery_app.autodiscover_tasks(["elevator_control.application"])
+import elevator_control.application.events.handlers  # noqa: E402, F401  4.3.2 — process_domain_event
