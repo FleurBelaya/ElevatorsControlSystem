@@ -1,7 +1,18 @@
 from datetime import datetime
 from typing import Literal
 
+import re
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# 6.1.1 Валидация: своя проверка email без зависимости email-validator.
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def _validate_email(v: str) -> str:
+    if not isinstance(v, str) or not _EMAIL_RE.match(v):
+        raise ValueError("Некорректный email")
+    return v.lower()
 
 from elevator_control.domain.enums import (
     EventStatus,
@@ -11,18 +22,27 @@ from elevator_control.domain.enums import (
     TechnicianStatus,
 )
 
+# 6.1.1 Валидация входных данных: ключевой принцип — все DTO имеют extra="forbid",
+# что блокирует Mass Assignment (любое неизвестное поле в payload отвергается).
+# 6.1.2 Mass Assignment: ни один Create/Update DTO не содержит owner_id, id или
+# created_at — серверная логика заполняет эти поля сама.
+
+_FORBID = ConfigDict(extra="forbid")
+
 
 class LiftCreate(BaseModel):
-    model: str = Field(..., max_length=128)
+    model_config = _FORBID
+    model: str = Field(..., min_length=1, max_length=128)
     status: LiftStatus = LiftStatus.ACTIVE
-    location: str = Field(..., max_length=256)
+    location: str = Field(..., min_length=1, max_length=256)
     is_emergency: bool = False
 
 
 class LiftUpdate(BaseModel):
-    model: str | None = None
+    model_config = _FORBID
+    model: str | None = Field(None, min_length=1, max_length=128)
     status: LiftStatus | None = None
-    location: str | None = None
+    location: str | None = Field(None, min_length=1, max_length=256)
     is_emergency: bool | None = None
 
 
@@ -37,28 +57,23 @@ class LiftRead(BaseModel):
 
 
 class LiftRestoreStateRequest(BaseModel):
-    """Параметры восстановления лифта (все поля необязательны)."""
-
-    target_status: LiftStatus = Field(
-        default=LiftStatus.ACTIVE,
-        description="Статус лифта после восстановления (по умолчанию active)",
-    )
-    reset_sensors: bool = Field(
-        default=True,
-        description="Сбросить показания всех датчиков лифта в безопасную зону (ниже порога)",
-    )
+    model_config = _FORBID
+    target_status: LiftStatus = Field(default=LiftStatus.ACTIVE)
+    reset_sensors: bool = Field(default=True)
 
 
 class SensorCreate(BaseModel):
-    sensor_type: str = Field(..., max_length=64)
-    current_value: float = 0.0
-    threshold_norm: float
+    model_config = _FORBID
+    sensor_type: str = Field(..., min_length=1, max_length=64)
+    current_value: float = Field(0.0, ge=-1e6, le=1e6)
+    threshold_norm: float = Field(..., ge=0, le=1e6)
 
 
 class SensorUpdate(BaseModel):
-    sensor_type: str | None = Field(None, max_length=64)
-    current_value: float | None = None
-    threshold_norm: float | None = None
+    model_config = _FORBID
+    sensor_type: str | None = Field(None, min_length=1, max_length=64)
+    current_value: float | None = Field(None, ge=-1e6, le=1e6)
+    threshold_norm: float | None = Field(None, ge=0, le=1e6)
 
 
 class SensorRead(BaseModel):
@@ -77,15 +92,17 @@ class LiftRestoreStateResponse(BaseModel):
 
 
 class EventCreate(BaseModel):
-    lift_id: int
+    model_config = _FORBID
+    lift_id: int = Field(..., ge=1)
     event_type: EventType
-    description: str
+    description: str = Field(..., min_length=1, max_length=4000)
     status: EventStatus = EventStatus.NEW
 
 
 class EventUpdate(BaseModel):
+    model_config = _FORBID
     event_type: EventType | None = None
-    description: str | None = None
+    description: str | None = Field(None, min_length=1, max_length=4000)
     status: EventStatus | None = None
 
 
@@ -100,16 +117,18 @@ class EventRead(BaseModel):
 
 
 class ServiceRequestCreate(BaseModel):
-    lift_id: int
-    reason: str
+    model_config = _FORBID
+    lift_id: int = Field(..., ge=1)
+    reason: str = Field(..., min_length=1, max_length=4000)
     status: ServiceRequestStatus = ServiceRequestStatus.PENDING
-    technician_id: int | None = None
+    technician_id: int | None = Field(None, ge=1)
 
 
 class ServiceRequestUpdate(BaseModel):
-    reason: str | None = None
+    model_config = _FORBID
+    reason: str | None = Field(None, min_length=1, max_length=4000)
     status: ServiceRequestStatus | None = None
-    technician_id: int | None = None
+    technician_id: int | None = Field(None, ge=1)
 
 
 class ServiceRequestRead(BaseModel):
@@ -123,12 +142,14 @@ class ServiceRequestRead(BaseModel):
 
 
 class TechnicianCreate(BaseModel):
-    name: str = Field(..., max_length=128)
+    model_config = _FORBID
+    name: str = Field(..., min_length=1, max_length=128)
     status: TechnicianStatus = TechnicianStatus.FREE
 
 
 class TechnicianUpdate(BaseModel):
-    name: str | None = Field(None, max_length=128)
+    model_config = _FORBID
+    name: str | None = Field(None, min_length=1, max_length=128)
     status: TechnicianStatus | None = None
 
 
@@ -141,13 +162,15 @@ class TechnicianRead(BaseModel):
 
 
 class ReportCreate(BaseModel):
-    service_request_id: int
-    work_description: str
+    model_config = _FORBID
+    service_request_id: int = Field(..., ge=1)
+    work_description: str = Field(..., min_length=1, max_length=8000)
     final_lift_status: LiftStatus
 
 
 class ReportUpdate(BaseModel):
-    work_description: str | None = None
+    model_config = _FORBID
+    work_description: str | None = Field(None, min_length=1, max_length=8000)
     final_lift_status: LiftStatus | None = None
 
 
@@ -169,21 +192,13 @@ class Paginated(BaseModel):
 
 
 class EmergencyDemoRequest(BaseModel):
-    """Тело POST для демонстрации атомарной аварийной транзакции."""
-
-    sensor_id: int | None = Field(
-        default=None,
-        description=(
-            "Id существующего датчика этого лифта (≥1). Не указывайте поле или передайте null — "
-            "тогда возьмётся первый датчик лифта. Значение 0 недопустимо (в БД нет id=0)."
-        ),
-    )
-    note: str | None = Field(default=None, max_length=512, description="Доп. текст в описание инцидента")
+    model_config = _FORBID
+    sensor_id: int | None = Field(default=None)
+    note: str | None = Field(default=None, max_length=512)
 
     @field_validator("sensor_id", mode="before")
     @classmethod
     def sensor_id_zero_means_auto(cls, v: object) -> object:
-        """Swagger часто подставляет 0 — обрабатываем как «датчик не выбран»."""
         if v == 0:
             return None
         return v
@@ -199,36 +214,44 @@ class EmergencyDemoResponse(BaseModel):
 
 
 class UserRegister(BaseModel):
-    # 2.1 Авторизация RBAC
+    # 6.1.1 Валидация: жёсткий формат email и минимальная длина пароля.
+    model_config = _FORBID
     email: str = Field(..., max_length=320)
     password: str = Field(..., min_length=8, max_length=256)
-
-    # 3.2 Разные клиенты — разные сценарии:
-    # разрешаем регистрировать пользователей с разными ролями, чтобы у каждого клиента был свой UI/сценарий работы.
     role: Literal["dispatcher", "technician", "administrator"] = "dispatcher"
-    admin_code: str | None = Field(
-        default=None,
-        max_length=128,
-        description=(
-            "Optional admin registration code (required if you register as administrator and you are not the first user)."
-        ),
-    )
+    admin_code: str | None = Field(default=None, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def _email_format(cls, v: str) -> str:
+        return _validate_email(v)
 
 
 class UserLogin(BaseModel):
-    # 2.1 Авторизация RBAC
+    model_config = _FORBID
     email: str = Field(..., max_length=320)
     password: str = Field(..., min_length=1, max_length=256)
 
+    @field_validator("email")
+    @classmethod
+    def _email_format(cls, v: str) -> str:
+        return _validate_email(v)
+
 
 class TokenResponse(BaseModel):
-    # 2.1 Авторизация RBAC
+    # 6.2.1 access + 6.2.2 refresh
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
 
 
+class RefreshRequest(BaseModel):
+    # 6.2.2 Refresh-эндпоинт принимает только refresh_token.
+    model_config = _FORBID
+    refresh_token: str = Field(..., min_length=10, max_length=8000)
+
+
 class UserRead(BaseModel):
-    # 2.1 Авторизация RBAC
     id: int
     email: str
     roles: list[str] = []

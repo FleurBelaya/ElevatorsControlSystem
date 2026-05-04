@@ -17,19 +17,41 @@ class Settings(BaseSettings):
 
     simulation_interval_seconds: float = 4.0
 
-    # 2.1 Авторизация RBAC
+    # 2.1 Авторизация RBAC + 6.2 JWT
     jwt_secret_key: str = "CHANGE_ME"
-    access_token_ttl_seconds: int = 60 * 60
+    # 6.2.1 Срок жизни access-токена: короткий, ~15 минут.
+    access_token_ttl_seconds: int = 15 * 60
+    # 6.2.2 Refresh-токен: дольше, ~7 суток.
+    refresh_token_ttl_seconds: int = 7 * 24 * 60 * 60
 
-    # 3.2 Разные клиенты — разные сценарии (MVP):
-    # общий код, чтобы разрешить регистрацию дополнительных аккаунтов администратора.
-    registration_admin_code: str | None = Field(default=None, validation_alias="ELEVATOR_REGISTRATION_ADMIN_CODE")
+    # 3.2 / регистрация второго и более администратора через общий код
+    registration_admin_code: str | None = Field(
+        default=None, validation_alias="ELEVATOR_REGISTRATION_ADMIN_CODE"
+    )
 
     # 2.5.2 - Интеграция очереди: настройки Celery
-    # По умолчанию используется файловый брокер (SQLite/filesystem) — работает
-    # без установки Redis/RabbitMQ. Для продакшена замените на redis://localhost:6379/0
     celery_broker_url: str = "filesystem://"
     celery_result_backend: str = "db+sqlite:///celery_results.db"
+
+    # 6.3.4 CORS: только разрешённые домены. Список через запятую в .env.
+    # По умолчанию — локальные адреса разработчика и сборки клиентов.
+    cors_allowed_origins: str = (
+        "http://localhost:8000,http://127.0.0.1:8000,"
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
+
+    # 6.3.1 Rate limiting: лимиты на минуту и на 10 секунд.
+    rate_limit_per_minute: int = 120
+    rate_limit_burst_per_10s: int = 30
+
+    # 4.4 Eventual Consistency: задержка обработки доменных событий воркером.
+    cqrs_event_delay_seconds: int = 2
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        # 6.3.4 CORS whitelist: парсим строку из переменной окружения.
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
     @property
     def database_url_async(self) -> str:
