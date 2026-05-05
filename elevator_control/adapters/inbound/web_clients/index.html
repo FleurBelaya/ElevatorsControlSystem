@@ -892,6 +892,21 @@
             inset 0 -2px 6px rgba(0,0,0,0.4),
             0 4px 12px rgba(0,0,0,0.45),
             0 0 20px rgba(245,207,133,0.18); }
+        .lp-cabin.moving { outline: 1px solid rgba(109,211,255,0.35); outline-offset: 1px; }
+        .lp-cabin.moving::after {
+            content: '';
+            position: absolute;
+            left: -10px; right: -10px; top: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.7;
+            animation: cabin-trail 1s linear infinite;
+        }
+        @keyframes cabin-trail {
+            0%   { transform: scaleX(0.4); opacity: 0; }
+            50%  { opacity: 0.7; }
+            100% { transform: scaleX(1); opacity: 0; }
+        }
         .lp-cabin .lp-doors {
             position: absolute; left: 6px; right: 6px; top: 5px; bottom: 5px;
             display: flex; gap: 2px;
@@ -925,9 +940,20 @@
             text-shadow: 0 0 6px var(--gold-glow);
         }
         .lp-led .lp-led-arrow { width: 0; height: 0; }
-        .lp-led .lp-led-arrow.up   { border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); }
-        .lp-led .lp-led-arrow.down { border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); }
+        .lp-led .lp-led-arrow.up   { border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); animation: arrow-blink 0.8s ease-in-out infinite; }
+        .lp-led .lp-led-arrow.down { border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); animation: arrow-blink 0.8s ease-in-out infinite; }
         .lp-led .lp-led-arrow.idle { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+        @keyframes arrow-blink {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50%      { opacity: 0.45; transform: translateY(-1px); }
+        }
+        .lp-status {
+            font-size: 11px; color: var(--text-2); letter-spacing: 0.04em;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .lp-status.moving  { color: var(--accent-2); }
+        .lp-status.doors   { color: var(--warn); }
+        .lp-status.emerg   { color: var(--crit); }
 
         /* Информация и контролы */
         .lp-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -1524,6 +1550,8 @@ function renderPanelCard(p) {
     const cabinClasses = ['lp-cabin'];
     if (p.doors_open) cabinClasses.push('doors-open');
     if (p.lights_on) cabinClasses.push('lights-on');
+    if (p.direction !== 'idle') cabinClasses.push('moving');
+    const statusInfo = liftStatusText(p);
     const sensorsHtml = (p.sensors || []).map(s => {
         const cls = s.ratio > 1.2 ? 'crit' : (s.ratio > 1 ? 'warn' : '');
         return `<span class="lp-sensor-chip ${cls}">${s.sensor_type}: ${s.current_value.toFixed(1)}/${s.threshold_norm}</span>`;
@@ -1543,6 +1571,7 @@ function renderPanelCard(p) {
                 <span class="lp-led-num">${String(p.current_floor).padStart(2,'0')}</span>
                 <span class="lp-led-arrow ${arrowCls}"></span>
             </div>
+            <div class="lp-status ${statusInfo.cls}">${statusInfo.text}</div>
         </div>
         <div class="lp-info">
             <div class="lp-info-head">
@@ -1565,6 +1594,14 @@ function renderPanelCard(p) {
             <div class="lp-sensors">${sensorsHtml || '<span style="font-size:11px;color:var(--text-3)">Нет датчиков</span>'}</div>
         </div>
     </div>`;
+}
+
+function liftStatusText(p) {
+    if (p.is_emergency) return { cls: 'emerg', text: '⚠ Авария' };
+    if (p.direction === 'up')   return { cls: 'moving', text: 'В пути ↑ к ' + p.target_floor };
+    if (p.direction === 'down') return { cls: 'moving', text: 'В пути ↓ к ' + p.target_floor };
+    if (p.doors_open) return { cls: 'doors', text: 'Двери открыты · этаж ' + p.current_floor };
+    return { cls: '', text: 'Стоянка · этаж ' + p.current_floor };
 }
 
 function liftCabinPosition(floor, total) {
@@ -1601,6 +1638,7 @@ async function refreshPanel() {
             cabin.style.bottom = pos.bottom + '%';
             cabin.classList.toggle('doors-open', !!p.doors_open);
             cabin.classList.toggle('lights-on', !!p.lights_on);
+            cabin.classList.toggle('moving', p.direction !== 'idle');
         }
         if (cable) cable.style.height = (100 - pos.bottom) + '%';
         // LED-табло
@@ -1610,6 +1648,13 @@ async function refreshPanel() {
         if (arr) {
             arr.classList.remove('up','down','idle');
             arr.classList.add(p.direction === 'up' ? 'up' : (p.direction === 'down' ? 'down' : 'idle'));
+        }
+        // Статус-текст
+        const status = card.querySelector('.lp-status');
+        if (status) {
+            const info = liftStatusText(p);
+            status.className = 'lp-status ' + info.cls;
+            status.textContent = info.text;
         }
         // Кнопки этажей
         card.querySelectorAll('.lp-fbtn').forEach(btn => {
