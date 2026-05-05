@@ -990,12 +990,36 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// 3.1 - Единый бэкенд API: все запросы идут к единому API /api/v1, клиент не содержит локальной логики данных
-const API = '/api/v1';
+// 3.1 - Единый бэкенд API: все запросы идут к единому API /api/v1, клиент не содержит локальной логики данных.
+// Используем абсолютный URL на основе текущего origin, чтобы избежать ошибок WebKit/WKWebView
+// при разрешении относительных путей в нестандартных окружениях.
+const API_BASE = (function () {
+    try {
+        const o = window.location && window.location.origin;
+        if (o && /^https?:\/\//.test(o)) return o;
+    } catch (_) { /* ignore */ }
+    return 'http://127.0.0.1:8000';
+})();
+const API = API_BASE + '/api/v1';
+
+// Чистим localStorage от мусорных значений, которые могли остаться от прошлых версий.
+(function () {
+    const t = localStorage.getItem('token');
+    if (t === 'undefined' || t === 'null' || t === '') localStorage.removeItem('token');
+})();
+
 let token = localStorage.getItem('token');
 let currentUser = null;
 let currentSection = 'lifts';
 let autoRefreshTimer = null;
+
+// Глобальный логгер — помогает диагностировать ошибки внутри pywebview/WKWebView.
+window.addEventListener('error', function (ev) {
+    try { console.error('window.error:', ev.message, ev.error); } catch (_) {}
+});
+window.addEventListener('unhandledrejection', function (ev) {
+    try { console.error('unhandledrejection:', ev.reason); } catch (_) {}
+});
 
 // ========= SVG-иконки навигации =========
 const NAV_ICONS = {
@@ -1008,30 +1032,75 @@ const NAV_ICONS = {
 };
 
 // ==================== 3.1 - API HELPERS ====================
-async function api(method, path, body) {
-    const opts = { method, headers: {} };
-    if (token) opts.headers['Authorization'] = 'Bearer ' + token;
-    if (body !== undefined) {
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(body);
-    }
-    const res = await fetch(API + path, opts);
-    if (res.status === 204) return null;
-    const data = await res.json();
-    // 3.4 - Обработка ошибок: выбрасываем исключение с текстом от API при неуспешном ответе
-    if (!res.ok) {
-        throw new Error(data.detail || `Ошибка ${res.status}`);
-    }
-    return data;
+// Реализация через XMLHttpRequest — стабильнее fetch в pywebview/WKWebView.
+function api(method, path, body) {
+    return new Promise(function (resolve, reject) {
+        let xhr;
+        try {
+            xhr = new XMLHttpRequest();
+            xhr.open(method, API + path, true);
+        } catch (e) {
+            return reject(new Error('Не удалось подготовить запрос к серверу'));
+        }
+        try {
+            if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            if (body !== undefined) xhr.setRequestHeader('Content-Type', 'application/json');
+        } catch (e) { /* invalid header — игнорируем, ответ всё равно придёт */ }
+
+        xhr.onload = function () {
+            const status = xhr.status;
+            if (status === 204) return resolve(null);
+            const text = xhr.responseText || '';
+            let data = null;
+            if (text) {
+                try { data = JSON.parse(text); }
+                catch (_) {
+                    return reject(new Error('Ответ сервера не является JSON (HTTP ' + status + ')'));
+                }
+            }
+            if (status >= 200 && status < 300) return resolve(data);
+            // 3.4 - Обработка ошибок: формируем понятное сообщение
+            let msg;
+            if (data && typeof data.detail === 'string') {
+                msg = data.detail;
+            } else if (data && Array.isArray(data.detail)) {
+                msg = data.detail.map(function (d) {
+                    if (!d) return '';
+                    if (typeof d === 'string') return d;
+                    return d.msg || JSON.stringify(d);
+                }).filter(Boolean).join('; ') || ('Ошибка валидации (HTTP ' + status + ')');
+            } else {
+                msg = 'Ошибка ' + status;
+            }
+            reject(new Error(msg));
+        };
+        xhr.onerror = function () {
+            reject(new Error('Сеть: не удалось подключиться к серверу. Проверьте, что бэкенд запущен.'));
+        };
+        xhr.ontimeout = function () {
+            reject(new Error('Сеть: превышено время ожидания ответа сервера.'));
+        };
+        try {
+            xhr.send(body !== undefined ? JSON.stringify(body) : null);
+        } catch (e) {
+            reject(new Error('Не удалось отправить запрос: ' + (e && e.message ? e.message : String(e))));
+        }
+    });
 }
 
 // 3.4 - Обработка ошибок: отображение сообщений об ошибках и успехе через toast
 function showToast(msg, type) {
     const t = document.getElementById('toast');
-    t.textContent = msg;
+    let text = msg == null ? '' : String(msg);
+    // Подменяем непонятные WebKit-сообщения на читаемые.
+    if (/did not match the expected pattern/i.test(text)) {
+        text = 'Не удалось выполнить запрос. Проверьте, что бэкенд запущен и доступен по адресу ' + API_BASE;
+    }
+    t.textContent = text;
     t.className = 'toast show' + (type === 'success' ? ' toast-success' : '');
     clearTimeout(t._timer);
     t._timer = setTimeout(() => t.className = 'toast', 4000);
+    if (type !== 'success') { try { console.error('toast:', text); } catch (_) {} }
 }
 
 function badge(val) {
