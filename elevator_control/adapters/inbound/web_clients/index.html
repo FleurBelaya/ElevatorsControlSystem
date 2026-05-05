@@ -14,120 +14,965 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Система управления лифтами</title>
+    <title>ELEVATOR · Система управления лифтами</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
+        /* ============================================================
+           ELEVATOR CONTROL — design system
+           Тёмный «диспетчерский пульт»: металлические градиенты,
+           объёмные кнопки этажей, скевоморфные индикаторы и LED-табло.
+           ============================================================ */
+        :root {
+            /* фоны */
+            --bg-deep:        #0a0e14;
+            --bg-base:        #0f141c;
+            --bg-elev-1:      #161d28;
+            --bg-elev-2:      #1d2532;
+            --bg-elev-3:      #2a3343;
+            /* металл (для шлифованных поверхностей панелей) */
+            --metal-1:        #2c3544;
+            --metal-2:        #1a2030;
+            --metal-edge:     #3e4a5d;
+            --metal-rivet:    #4a5566;
+            /* текст */
+            --text-1:         #e6edf7;
+            --text-2:         #9aa6b8;
+            --text-3:         #5d6877;
+            --text-mute:      #4a5563;
+            /* акценты */
+            --accent:         #5ad1ff;     /* электрик-блю — индикатор работы */
+            --accent-2:       #7fdcff;
+            --accent-glow:    rgba(90,209,255,0.45);
+            --gold:           #f5b942;     /* латунь / латунные кнопки */
+            --gold-2:         #ffcf6b;
+            --gold-glow:      rgba(245,185,66,0.45);
+            --warn:           #ffb547;
+            --crit:           #ff5969;
+            --crit-glow:      rgba(255,89,105,0.55);
+            --ok:             #4ade80;
+            --ok-glow:        rgba(74,222,128,0.5);
+            --primary:        #4f8cff;
+            --primary-glow:   rgba(79,140,255,0.45);
+            --purple:         #a78bfa;
+            /* линии и тени */
+            --border:         rgba(255,255,255,0.06);
+            --border-strong:  rgba(255,255,255,0.12);
+            --hairline:       rgba(255,255,255,0.04);
+            --shadow-deep:    0 24px 60px rgba(0,0,0,0.55), 0 6px 18px rgba(0,0,0,0.45);
+            --shadow-card:    0 12px 28px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35);
+            --shadow-soft:    0 6px 18px rgba(0,0,0,0.35);
+            --inset-top:      inset 0 1px 0 rgba(255,255,255,0.08);
+            --inset-bottom:   inset 0 -1px 0 rgba(0,0,0,0.5);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            color: var(--text-1);
+            background: var(--bg-deep);
+            background-image:
+                radial-gradient(1100px 600px at 12% -10%, rgba(90,209,255,0.10), transparent 60%),
+                radial-gradient(900px 500px at 90% 0%, rgba(245,185,66,0.08), transparent 60%),
+                radial-gradient(800px 600px at 50% 110%, rgba(79,140,255,0.10), transparent 60%),
+                linear-gradient(180deg, #0a0e14 0%, #0d121a 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            letter-spacing: 0.005em;
+        }
+        .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; letter-spacing: 0; }
 
-        /* --- Auth --- */
-        .auth-container { max-width: 400px; margin: 80px auto; background: #fff; padding: 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .auth-container h1 { text-align: center; margin-bottom: 24px; font-size: 22px; }
-        .auth-container input, .auth-container select { width: 100%; padding: 10px 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        .auth-container button { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
-        .auth-container button:hover { background: #1d4ed8; }
-        .auth-toggle { text-align: center; margin-top: 12px; font-size: 13px; }
-        .auth-toggle a { color: #2563eb; cursor: pointer; text-decoration: underline; }
+        /* === Тонкие декоративные «заклёпки» по углам панелей === */
+        .rivets::before, .rivets::after,
+        .rivets > .rivet-tl, .rivets > .rivet-tr,
+        .rivets > .rivet-bl, .rivets > .rivet-br { display: none; }
+
+        /* ===================================================
+           AUTH SCREEN — пульт авторизации
+           =================================================== */
+        #auth-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+        }
+        #auth-screen::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-size: 48px 48px;
+            background-position: -1px -1px;
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black, transparent 80%);
+            pointer-events: none;
+        }
+
+        .auth-shell {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: minmax(0, 480px) minmax(0, 380px);
+            gap: 28px;
+            align-items: stretch;
+            max-width: 920px;
+            width: 100%;
+        }
+        @media (max-width: 880px) {
+            .auth-shell { grid-template-columns: 1fr; max-width: 460px; }
+            .shaft-illustration { display: none; }
+        }
+
+        .auth-container {
+            position: relative;
+            background: linear-gradient(160deg, var(--bg-elev-2), var(--bg-elev-1) 70%, var(--bg-elev-2));
+            border: 1px solid var(--border-strong);
+            border-radius: 22px;
+            padding: 30px 30px 26px;
+            box-shadow: var(--shadow-deep), var(--inset-top);
+            overflow: hidden;
+        }
+        .auth-container::before {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+                radial-gradient(circle at 50% -10%, rgba(90,209,255,0.18), transparent 60%),
+                radial-gradient(circle at 100% 100%, rgba(245,185,66,0.10), transparent 60%);
+            pointer-events: none;
+        }
+        .auth-container::after {
+            content: '';
+            position: absolute; left: 18px; right: 18px; top: 18px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 22px;
+            position: relative;
+            z-index: 2;
+        }
+        .brand-mark {
+            position: relative;
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            background: linear-gradient(160deg, #1f2a3a, #0f1620);
+            border: 1px solid var(--border-strong);
+            box-shadow: var(--inset-top), 0 6px 14px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--accent);
+        }
+        .brand-mark::after {
+            content: '';
+            position: absolute; inset: 4px;
+            border-radius: 10px;
+            background: radial-gradient(circle at 30% 20%, rgba(90,209,255,0.22), transparent 60%);
+            pointer-events: none;
+        }
+        .brand-text { line-height: 1.1; }
+        .brand-text .b-name {
+            font-size: 17px; font-weight: 800; letter-spacing: 0.18em;
+            background: linear-gradient(90deg, #fff, var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .brand-text .b-sub { font-size: 11px; color: var(--text-2); margin-top: 3px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+        .auth-container h1 {
+            font-size: 22px; font-weight: 700; margin-bottom: 6px;
+            position: relative; z-index: 2;
+            letter-spacing: -0.01em;
+        }
+        .auth-sub { font-size: 13px; color: var(--text-2); margin-bottom: 22px; position: relative; z-index: 2; }
+
+        /* Inputs */
+        .field-group { position: relative; z-index: 2; margin-bottom: 12px; }
+        .field-label { display:block; font-size:11px; font-weight:600; color:var(--text-2); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px; }
+        .auth-container input,
+        .auth-container select {
+            width: 100%;
+            padding: 12px 14px;
+            background: linear-gradient(180deg, var(--bg-deep), #0a0e15);
+            color: var(--text-1);
+            border: 1px solid var(--border-strong);
+            border-radius: 11px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+            outline: none;
+            box-shadow: inset 0 2px 0 rgba(0,0,0,0.35), inset 0 -1px 0 rgba(255,255,255,0.04);
+        }
+        .auth-container input:focus,
+        .auth-container select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow), inset 0 2px 0 rgba(0,0,0,0.35);
+        }
+        .auth-container select { appearance: none; background-image: linear-gradient(180deg, var(--bg-deep), #0a0e15), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%239aa6b8'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+
+        .btn-primary-3d {
+            position: relative;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%;
+            padding: 13px 18px;
+            margin-top: 8px;
+            font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
+            color: #0a0e14;
+            background: linear-gradient(180deg, var(--gold-2), var(--gold) 60%, #c98c1f);
+            border: 1px solid #b8861f;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow:
+                0 1px 0 rgba(255,255,255,0.4) inset,
+                0 -2px 0 rgba(0,0,0,0.35) inset,
+                0 8px 18px rgba(245,185,66,0.25),
+                0 2px 6px rgba(0,0,0,0.5);
+            transition: transform .12s, box-shadow .12s, filter .12s;
+        }
+        .btn-primary-3d:hover { filter: brightness(1.05); }
+        .btn-primary-3d:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 -1px 0 rgba(0,0,0,0.35) inset, 0 4px 10px rgba(245,185,66,0.2), 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: var(--text-2); position: relative; z-index: 2; }
+        .auth-toggle a { color: var(--accent-2); cursor: pointer; font-weight: 600; }
+        .auth-toggle a:hover { color: #fff; }
+
         #admin-code-group { display: none; }
+        .admin-hint {
+            font-size: 11px; color: var(--text-3);
+            background: rgba(255,255,255,0.03);
+            border: 1px dashed var(--border-strong);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        .admin-hint b { color: var(--gold-2); font-family: 'JetBrains Mono', monospace; }
 
-        /* --- Layout --- */
-        .app-header { background: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5e5; }
-        .app-header h2 { font-size: 16px; }
-        .app-header .user-info { font-size: 13px; color: #666; }
-        .app-header .user-info span { background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 4px; margin-left: 6px; font-size: 12px; }
-        .app-header button { background: #ef4444; color: #fff; border: none; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-size: 13px; }
-        .app-body { display: flex; min-height: calc(100vh - 50px); }
-        .sidebar { width: 200px; background: #fff; border-right: 1px solid #e5e5e5; padding: 16px 0; }
-        .sidebar a { display: block; padding: 10px 20px; color: #333; text-decoration: none; font-size: 14px; cursor: pointer; }
-        .sidebar a:hover, .sidebar a.active { background: #eff6ff; color: #2563eb; }
-        .content { flex: 1; padding: 24px; }
+        .demo-creds {
+            position: relative; z-index: 2;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(90,209,255,0.06), rgba(90,209,255,0.02));
+            border: 1px solid rgba(90,209,255,0.18);
+        }
+        .demo-creds .dc-title {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--accent-2);
+            text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        }
+        .demo-creds .dc-row {
+            display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center;
+            padding: 6px 0;
+            font-size: 12px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .demo-creds .dc-row:first-of-type { border-top: 0; }
+        .demo-creds .dc-role {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+        }
+        .demo-creds .dc-role::before {
+            content: ''; width: 8px; height: 8px; border-radius: 50%;
+            box-shadow: 0 0 8px currentColor;
+        }
+        .demo-creds .dc-role.admin { color: var(--gold-2); }
+        .demo-creds .dc-role.disp { color: var(--accent-2); }
+        .demo-creds .dc-role.tech { color: var(--ok); }
+        .demo-creds .dc-cell { font-family: 'JetBrains Mono', monospace; color: var(--text-1); cursor: pointer; }
+        .demo-creds .dc-cell:hover { color: var(--accent-2); }
 
-        /* --- Tables --- */
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-        th { background: #f9fafb; font-weight: 600; color: #555; }
-        .btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; }
-        .btn-primary { background: #2563eb; color: #fff; }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .btn-success { background: #16a34a; color: #fff; }
-        .btn-warning { background: #f59e0b; color: #fff; }
-        .btn-sm { padding: 4px 8px; font-size: 11px; }
+        /* === Иллюстрация шахты лифта рядом с формой === */
+        .shaft-illustration {
+            position: relative;
+            background: linear-gradient(160deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border-strong);
+            border-radius: 22px;
+            padding: 28px;
+            box-shadow: var(--shadow-deep), var(--inset-top);
+            overflow: hidden;
+            display: flex; flex-direction: column; gap: 18px;
+        }
+        .shaft-illustration h3 {
+            font-size: 13px; font-weight: 700; letter-spacing: 0.18em;
+            color: var(--text-2); text-transform: uppercase;
+        }
+        .shaft-stage {
+            position: relative;
+            flex: 1;
+            min-height: 320px;
+            border-radius: 16px;
+            background:
+                linear-gradient(180deg, #0a0e15 0%, #131a25 100%);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: inset 0 8px 24px rgba(0,0,0,0.6);
+        }
+        .shaft-rails { position: absolute; top: 12px; bottom: 12px; left: 50%; transform: translateX(-50%); width: 130px; }
+        .shaft-rails::before, .shaft-rails::after {
+            content:''; position:absolute; top:0; bottom:0; width:3px;
+            background: linear-gradient(180deg, #2c3544, #1a2030);
+            box-shadow: inset 1px 0 0 rgba(255,255,255,0.1);
+        }
+        .shaft-rails::before { left:0; }
+        .shaft-rails::after  { right:0; }
+        .shaft-floors {
+            position: absolute; left: 0; right: 0; top: 12px; bottom: 12px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 0 14px;
+        }
+        .shaft-floor {
+            height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+            display: flex; align-items: center; justify-content: space-between;
+            position: relative;
+        }
+        .shaft-floor span {
+            position: absolute; top: -7px; left: 4px;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            color: var(--text-3); background: rgba(0,0,0,0.5); padding: 1px 4px; border-radius: 3px;
+        }
+        .cabin {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            top: 56%;
+            width: 110px; height: 70px;
+            border-radius: 8px;
+            background: linear-gradient(160deg, #3a4658, #1d2535);
+            border: 1px solid var(--border-strong);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.15),
+                inset 0 -2px 6px rgba(0,0,0,0.4),
+                0 6px 14px rgba(0,0,0,0.5),
+                0 0 18px rgba(90,209,255,0.18);
+            animation: cabin-move 9s ease-in-out infinite;
+        }
+        .cabin::before {
+            content: ''; position: absolute; left: 8px; right: 8px; top: 8px; bottom: 18px;
+            border-radius: 4px;
+            background:
+                linear-gradient(90deg, #4a5566 49%, #1a2030 50%, #1a2030 50%, #4a5566 51%) center / 100% 100%,
+                linear-gradient(180deg, #1a2030, #0e131c);
+            background-blend-mode: normal;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .cabin::after {
+            content: ''; position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%);
+            width: 26px; height: 6px; border-radius: 4px;
+            background: linear-gradient(90deg, #1a2030, #2c3544 50%, #1a2030);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .cabin-cable {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            top: 0; height: 56%; width: 2px;
+            background: linear-gradient(180deg, transparent, var(--metal-edge));
+            animation: cable-stretch 9s ease-in-out infinite;
+        }
+        @keyframes cabin-move {
+            0%, 100% { top: 70%; }
+            25%      { top: 18%; }
+            50%      { top: 42%; }
+            75%      { top: 8%;  }
+        }
+        @keyframes cable-stretch {
+            0%, 100% { height: 70%; }
+            25%      { height: 18%; }
+            50%      { height: 42%; }
+            75%      { height: 8%;  }
+        }
 
-        /* --- Badges --- */
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-        .badge-active { background: #dcfce7; color: #166534; }
-        .badge-stopped { background: #fee2e2; color: #991b1b; }
-        .badge-maintenance { background: #fef3c7; color: #92400e; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-critical { background: #fee2e2; color: #991b1b; }
-        .badge-new { background: #dbeafe; color: #1e40af; }
-        .badge-in_progress { background: #fef3c7; color: #92400e; }
-        .badge-resolved { background: #dcfce7; color: #166534; }
-        .badge-pending { background: #f3e8ff; color: #6b21a8; }
-        .badge-assigned { background: #dbeafe; color: #1e40af; }
-        .badge-completed { background: #dcfce7; color: #166534; }
-        .badge-cancelled { background: #f5f5f5; color: #666; }
-        .badge-free { background: #dcfce7; color: #166534; }
-        .badge-busy { background: #fee2e2; color: #991b1b; }
-        .emergency { color: #dc2626; font-weight: 700; }
+        .led-display {
+            display: flex; align-items: center; justify-content: space-between;
+            background: linear-gradient(180deg, #060a10, #0a1018);
+            border: 1px solid #1f2a37;
+            border-radius: 10px;
+            padding: 10px 14px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.7);
+        }
+        .led-label { font-size: 10px; color: var(--text-3); letter-spacing: 0.18em; text-transform: uppercase; }
+        .led-value {
+            font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px;
+            color: var(--gold-2);
+            text-shadow: 0 0 8px var(--gold-glow), 0 0 16px var(--gold-glow);
+            letter-spacing: 0.06em;
+        }
+        .led-arrow {
+            width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent;
+            border-bottom: 9px solid var(--accent);
+            filter: drop-shadow(0 0 6px var(--accent-glow));
+            animation: blink-up 1.2s ease-in-out infinite;
+        }
+        @keyframes blink-up {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50%      { opacity: .35; transform: translateY(-1px); }
+        }
 
-        /* --- Modal --- */
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; justify-content: center; align-items: center; }
-        .modal-overlay.show { display: flex; }
-        .modal { background: #fff; padding: 24px; border-radius: 8px; width: 420px; max-width: 90vw; }
-        .modal h3 { margin-bottom: 16px; }
-        .modal label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; margin-top: 10px; }
-        .modal input, .modal select, .modal textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; }
-        .modal textarea { min-height: 60px; resize: vertical; }
-        .modal-actions { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+        /* ====================================================
+           APP LAYOUT
+           ==================================================== */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 24px;
+            background: linear-gradient(180deg, rgba(15,20,28,0.92), rgba(15,20,28,0.78));
+            backdrop-filter: blur(14px) saturate(140%);
+            -webkit-backdrop-filter: blur(14px) saturate(140%);
+            border-bottom: 1px solid var(--border-strong);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+        }
+        .app-header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .app-header-title { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+        .app-header-title .h-name { font-size: 14px; font-weight: 800; letter-spacing: 0.18em; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .app-header-title .h-sub { font-size: 10px; color: var(--text-2); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 3px; }
 
-        /* --- Toolbar --- */
-        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .toolbar h3 { font-size: 18px; }
+        .app-header-right { display: flex; align-items: center; gap: 14px; }
+        .user-info {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 12px; color: var(--text-2);
+            padding: 6px 10px 6px 6px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-strong);
+            border-radius: 999px;
+            box-shadow: var(--inset-top);
+        }
+        .user-info .avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--primary));
+            color: #0a0e14; font-weight: 800; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--inset-top), 0 0 12px var(--accent-glow);
+        }
+        .user-info .email { color: var(--text-1); font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .user-info .role-pill {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+            padding: 3px 8px; border-radius: 999px;
+            background: rgba(90,209,255,0.12); color: var(--accent-2);
+            border: 1px solid rgba(90,209,255,0.24);
+        }
 
-        /* --- 3.4 - Обработка ошибок: toast-уведомления об ошибках API --- */
-        .toast { position: fixed; top: 16px; right: 16px; background: #fee2e2; color: #991b1b; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 200; display: none; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .toast.show { display: block; }
-        .toast.toast-success { background: #dcfce7; color: #166534; }
+        .btn-icon-ghost {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 14px;
+            background: linear-gradient(180deg, rgba(255,89,105,0.14), rgba(255,89,105,0.06));
+            color: #ffb1b9;
+            border: 1px solid rgba(255,89,105,0.28);
+            border-radius: 10px;
+            font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; letter-spacing: 0.06em;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        .btn-icon-ghost:hover { background: rgba(255,89,105,0.22); color: #fff; border-color: rgba(255,89,105,0.5); }
 
-        .refresh-hint { font-size: 12px; color: #999; margin-top: 8px; }
+        .app-body {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr);
+            min-height: calc(100vh - 65px);
+        }
+
+        /* ============= SIDEBAR ============= */
+        .sidebar {
+            position: sticky; top: 65px;
+            align-self: flex-start;
+            height: calc(100vh - 65px);
+            padding: 16px 14px;
+            background: linear-gradient(180deg, rgba(15,20,28,0.6), rgba(10,14,20,0.5));
+            border-right: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            display: flex; flex-direction: column; gap: 4px;
+            overflow-y: auto;
+        }
+        .sidebar-section-title {
+            padding: 10px 12px 6px; font-size: 10px; font-weight: 700;
+            color: var(--text-3); letter-spacing: 0.16em; text-transform: uppercase;
+        }
+        .sidebar a {
+            position: relative;
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px;
+            color: var(--text-2);
+            text-decoration: none;
+            font-size: 13.5px; font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background .15s, color .15s, transform .15s;
+        }
+        .sidebar a .nav-ico {
+            width: 22px; height: 22px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--text-3);
+            flex-shrink: 0;
+            transition: color .15s, transform .15s;
+        }
+        .sidebar a:hover { color: var(--text-1); background: rgba(255,255,255,0.04); }
+        .sidebar a:hover .nav-ico { color: var(--accent-2); }
+        .sidebar a.active {
+            color: #fff;
+            background: linear-gradient(180deg, rgba(90,209,255,0.16), rgba(90,209,255,0.04));
+            border: 1px solid rgba(90,209,255,0.22);
+            box-shadow: var(--inset-top), 0 4px 14px rgba(90,209,255,0.10);
+        }
+        .sidebar a.active .nav-ico { color: var(--accent); filter: drop-shadow(0 0 6px var(--accent-glow)); }
+        .sidebar a.active::before {
+            content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 3px;
+            border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, var(--accent), var(--primary));
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        .sidebar-foot {
+            margin-top: auto;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 11px; color: var(--text-3); letter-spacing: 0.04em;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 11px; color: var(--text-2);
+        }
+        .status-pill .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 8px var(--ok-glow);
+            animation: pulse 1.6s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: .55; }
+        }
+
+        /* ============= CONTENT ============= */
+        .content { padding: 24px 28px 40px; max-width: 100%; min-width: 0; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .toolbar h3 {
+            font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .toolbar h3::before {
+            content: ''; width: 4px; height: 22px; border-radius: 2px;
+            background: linear-gradient(180deg, var(--accent), var(--primary));
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .refresh-hint {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; color: var(--text-3); margin-top: 14px; letter-spacing: 0.04em;
+        }
+        .refresh-hint::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 6px var(--ok-glow);
+            animation: pulse 1.6s infinite;
+        }
+
+        /* ============= BUTTONS ============= */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 14px;
+            font-family: inherit; font-size: 12.5px; font-weight: 600;
+            border: 1px solid var(--border-strong);
+            border-radius: 9px;
+            cursor: pointer;
+            transition: transform .12s, filter .12s, box-shadow .12s, background .15s;
+            color: var(--text-1);
+            background: linear-gradient(180deg, var(--bg-elev-3), var(--bg-elev-2));
+            box-shadow: var(--inset-top), 0 2px 6px rgba(0,0,0,0.4);
+            letter-spacing: 0.02em;
+        }
+        .btn:hover { filter: brightness(1.08); }
+        .btn:active { transform: translateY(1px); }
+        .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+        .btn-primary {
+            background: linear-gradient(180deg, #5a9aff, #2f6dd9);
+            border-color: rgba(79,140,255,0.6);
+            color: #fff;
+            box-shadow: var(--inset-top), 0 4px 14px rgba(79,140,255,0.35);
+        }
+        .btn-primary:hover { background: linear-gradient(180deg, #6aa5ff, #3a78e0); }
+        .btn-success {
+            background: linear-gradient(180deg, #34d97e, #16a85a);
+            border-color: rgba(74,222,128,0.5);
+            color: #06160c;
+            box-shadow: var(--inset-top), 0 4px 14px rgba(74,222,128,0.3);
+        }
+        .btn-warning {
+            background: linear-gradient(180deg, #ffc973, #f5b942 60%, #c98c1f);
+            border-color: rgba(245,185,66,0.55);
+            color: #1d1305;
+            box-shadow: var(--inset-top), 0 4px 14px rgba(245,185,66,0.3);
+        }
+        .btn-danger {
+            background: linear-gradient(180deg, #ff7b87, #d6394a);
+            border-color: rgba(255,89,105,0.55);
+            color: #fff;
+            box-shadow: var(--inset-top), 0 4px 14px rgba(255,89,105,0.3);
+        }
+        .btn-ghost {
+            background: rgba(255,255,255,0.04);
+            color: var(--text-2);
+            border-color: var(--border-strong);
+            box-shadow: var(--inset-top);
+        }
+        .btn-ghost:hover { color: var(--text-1); background: rgba(255,255,255,0.08); }
+        .btn-add { padding: 9px 16px; font-size: 13px; }
+
+        /* ============= CARDS / TABLES ============= */
+        .panel {
+            background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+        }
+        .panel + .panel { margin-top: 14px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+        }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--hairline);
+            font-size: 13px;
+            color: var(--text-1);
+        }
+        th {
+            background: linear-gradient(180deg, var(--bg-elev-3), var(--bg-elev-2));
+            font-weight: 700; color: var(--text-2);
+            font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+            border-bottom: 1px solid var(--border-strong);
+        }
+        tbody tr { transition: background .15s; }
+        tbody tr:hover { background: rgba(255,255,255,0.025); }
+        tbody tr:last-child td { border-bottom: 0; }
+        td.actions { white-space: nowrap; }
+        td.actions .btn { margin-right: 4px; }
+        td.id-cell { font-family: 'JetBrains Mono', monospace; color: var(--text-2); }
+
+        .lift-section-title {
+            display: flex; align-items: center; gap: 12px;
+            margin: 22px 0 10px;
+            padding: 10px 14px;
+            background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px; font-weight: 700; color: var(--text-1);
+        }
+        .lift-section-title .ico {
+            width: 28px; height: 28px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: linear-gradient(160deg, var(--bg-elev-3), var(--bg-elev-1));
+            border: 1px solid var(--border-strong);
+            border-radius: 8px; color: var(--accent);
+            box-shadow: var(--inset-top);
+        }
+        .lift-section-title .ico-num {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: var(--gold-2);
+        }
+
+        /* ============= LED BADGES ============= */
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 10px 3px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            border: 1px solid var(--border-strong);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-1);
+            white-space: nowrap;
+        }
+        .badge::before {
+            content: ''; width: 7px; height: 7px; border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 6px currentColor, 0 0 12px currentColor;
+        }
+        .badge-active, .badge-resolved, .badge-completed, .badge-free { color: var(--ok); border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
+        .badge-stopped, .badge-critical, .badge-busy { color: var(--crit); border-color: rgba(255,89,105,0.32); background: rgba(255,89,105,0.08); }
+        .badge-maintenance, .badge-warning, .badge-in_progress { color: var(--warn); border-color: rgba(255,181,71,0.34); background: rgba(255,181,71,0.08); }
+        .badge-new, .badge-assigned { color: var(--accent); border-color: rgba(90,209,255,0.34); background: rgba(90,209,255,0.08); }
+        .badge-pending { color: var(--purple); border-color: rgba(167,139,250,0.36); background: rgba(167,139,250,0.08); }
+        .badge-cancelled { color: var(--text-2); border-color: var(--border-strong); background: rgba(255,255,255,0.04); }
+
+        .emergency {
+            color: #fff;
+            background: linear-gradient(90deg, #d6394a, #ff5969);
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            box-shadow: 0 0 16px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25);
+            animation: emergency-blink 1.2s ease-in-out infinite;
+            text-transform: uppercase;
+        }
+        @keyframes emergency-blink {
+            0%, 100% { box-shadow: 0 0 16px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
+            50%      { box-shadow: 0 0 26px var(--crit-glow), 0 0 4px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
+        }
+
+        /* ============= MODAL ============= */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(5,8,12,0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 100; justify-content: center; align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; animation: fade-in .2s ease; }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .modal {
+            position: relative;
+            background: linear-gradient(180deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border-strong);
+            padding: 26px 24px 22px;
+            border-radius: 18px;
+            width: 460px; max-width: 100%;
+            box-shadow: var(--shadow-deep), var(--inset-top);
+            max-height: 90vh; overflow-y: auto;
+            animation: modal-pop .25s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+        }
+        @keyframes modal-pop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+        .modal::before {
+            content: ''; position: absolute; left: 16px; right: 16px; top: 16px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+        }
+        .modal h3 { margin-bottom: 16px; font-size: 17px; font-weight: 700; }
+        .modal label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 12px 0 5px; color: var(--text-2); }
+        .modal input, .modal select, .modal textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: linear-gradient(180deg, var(--bg-deep), #0a0e15);
+            color: var(--text-1);
+            border: 1px solid var(--border-strong);
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .15s, box-shadow .15s;
+            box-shadow: inset 0 2px 0 rgba(0,0,0,0.35);
+        }
+        .modal input:focus, .modal select:focus, .modal textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow), inset 0 2px 0 rgba(0,0,0,0.35);
+        }
+        .modal select { appearance: none; background-image: linear-gradient(180deg, var(--bg-deep), #0a0e15), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%239aa6b8'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+        .modal textarea { min-height: 72px; resize: vertical; }
+        .modal-actions { margin-top: 18px; display: flex; gap: 10px; justify-content: flex-end; }
+
+        /* ============= TOAST ============= */
+        .toast {
+            position: fixed; top: 20px; right: 20px;
+            background: linear-gradient(180deg, rgba(255,89,105,0.18), rgba(255,89,105,0.08));
+            color: #ffd0d6;
+            border: 1px solid rgba(255,89,105,0.42);
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 13px; font-weight: 600;
+            z-index: 200; display: none;
+            max-width: 420px;
+            box-shadow: var(--shadow-deep);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+        .toast.show { display: block; animation: toast-in .25s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+        @keyframes toast-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .toast.toast-success {
+            background: linear-gradient(180deg, rgba(74,222,128,0.18), rgba(74,222,128,0.08));
+            color: #c8f7d8;
+            border-color: rgba(74,222,128,0.42);
+        }
+
+        /* === scrollbar === */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+
+        /* === wide screen polish === */
+        @media (min-width: 1400px) { .content { padding: 28px 36px 50px; } }
+        @media (max-width: 720px) {
+            .app-body { grid-template-columns: 1fr; }
+            .sidebar { position: relative; top: 0; height: auto; flex-direction: row; flex-wrap: wrap; padding: 10px; }
+            .sidebar a { flex: 1 1 calc(50% - 8px); }
+            .sidebar-section-title, .sidebar-foot { display: none; }
+        }
     </style>
 </head>
 <body>
 
+<!-- ===================== AUTH ===================== -->
 <!-- 3.2 - Разные клиенты — разные сценарии: экран авторизации с выбором роли -->
 <div id="auth-screen">
-    <div class="auth-container">
-        <h1>Система управления лифтами</h1>
-        <div id="auth-login">
-            <input type="email" id="login-email" placeholder="Email">
-            <input type="password" id="login-password" placeholder="Пароль">
-            <button onclick="doLogin()">Войти</button>
-            <div class="auth-toggle"><a onclick="showRegister()">Создать аккаунт</a></div>
-        </div>
-        <div id="auth-register" style="display:none">
-            <input type="email" id="reg-email" placeholder="Email">
-            <input type="password" id="reg-password" placeholder="Пароль (мин. 8 символов)">
-            <select id="reg-role" onchange="toggleAdminCode()">
-                <option value="dispatcher">Диспетчер</option>
-                <option value="technician">Техник</option>
-                <option value="administrator">Администратор</option>
-            </select>
-            <div id="admin-code-group">
-                <input type="text" id="reg-admin-code" placeholder="Код администратора">
+    <div class="auth-shell">
+        <div class="auth-container">
+            <div class="brand">
+                <div class="brand-mark">
+                    <!-- лифт-иконка -->
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <rect x="4" y="3" width="20" height="22" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
+                        <line x1="14" y1="3" x2="14" y2="25" stroke="currentColor" stroke-width="1.4" opacity="0.6"/>
+                        <path d="M9 11 L11 8 L13 11 Z" fill="currentColor"/>
+                        <path d="M19 17 L17 20 L15 17 Z" fill="currentColor" opacity="0.85"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="b-name">ELEVATOR</div>
+                    <div class="b-sub">Control · Diagnostic · Service</div>
+                </div>
             </div>
-            <button onclick="doRegister()">Зарегистрироваться</button>
-            <div class="auth-toggle"><a onclick="showLogin()">Уже есть аккаунт</a></div>
+            <h1>Доступ к диспетчерской</h1>
+            <div class="auth-sub">Введите учётные данные оператора, чтобы войти в систему мониторинга и управления лифтовым оборудованием.</div>
+
+            <div id="auth-login">
+                <div class="field-group">
+                    <label class="field-label" for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="operator@elevator.local" autocomplete="username">
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="login-password">Пароль</label>
+                    <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button class="btn-primary-3d" onclick="doLogin()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                    Войти в систему
+                </button>
+                <div class="auth-toggle">Нет учётной записи? <a onclick="showRegister()">Создать оператора</a></div>
+
+                <div class="demo-creds">
+                    <div class="dc-title">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        Демо-учётные записи (нажмите, чтобы подставить)
+                    </div>
+                    <div class="dc-row">
+                        <span class="dc-role admin">Admin</span>
+                        <span class="dc-cell" onclick="fillLogin('admin@elevator.local','Admin12345')">admin@elevator.local</span>
+                        <span class="dc-cell" onclick="fillLogin('admin@elevator.local','Admin12345')">Admin12345</span>
+                    </div>
+                    <div class="dc-row">
+                        <span class="dc-role disp">Disp.</span>
+                        <span class="dc-cell" onclick="fillLogin('dispatcher@elevator.local','Dispatch12345')">dispatcher@elevator.local</span>
+                        <span class="dc-cell" onclick="fillLogin('dispatcher@elevator.local','Dispatch12345')">Dispatch12345</span>
+                    </div>
+                    <div class="dc-row">
+                        <span class="dc-role tech">Tech.</span>
+                        <span class="dc-cell" onclick="fillLogin('technician@elevator.local','Technician12345')">technician@elevator.local</span>
+                        <span class="dc-cell" onclick="fillLogin('technician@elevator.local','Technician12345')">Technician12345</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="auth-register" style="display:none">
+                <div class="field-group">
+                    <label class="field-label" for="reg-email">Email</label>
+                    <input type="email" id="reg-email" placeholder="new.operator@elevator.local">
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="reg-password">Пароль (минимум 8 символов)</label>
+                    <input type="password" id="reg-password" placeholder="••••••••">
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="reg-role">Роль</label>
+                    <select id="reg-role" onchange="toggleAdminCode()">
+                        <option value="dispatcher">Диспетчер</option>
+                        <option value="technician">Техник</option>
+                        <option value="administrator">Администратор</option>
+                    </select>
+                </div>
+                <div id="admin-code-group">
+                    <div class="field-group">
+                        <label class="field-label" for="reg-admin-code">Код администратора</label>
+                        <input type="text" id="reg-admin-code" placeholder="ADMIN123">
+                        <div class="admin-hint">
+                            Регистрация роли <b>administrator</b> возможна только при наличии серверного кода
+                            из переменной окружения <b>ELEVATOR_REGISTRATION_ADMIN_CODE</b>.<br>
+                            По умолчанию в проекте установлен код <b>ADMIN123</b>.
+                            Для готового админа используйте: <b>admin@elevator.local</b> / <b>Admin12345</b>.
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-primary-3d" onclick="doRegister()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                    Создать оператора
+                </button>
+                <div class="auth-toggle">Уже зарегистрированы? <a onclick="showLogin()">Перейти ко входу</a></div>
+            </div>
+        </div>
+
+        <!-- 3D-иллюстрация шахты лифта -->
+        <div class="shaft-illustration">
+            <h3>Live · Cabin Position</h3>
+            <div class="shaft-stage">
+                <div class="shaft-floors">
+                    <div class="shaft-floor"><span>9</span></div>
+                    <div class="shaft-floor"><span>8</span></div>
+                    <div class="shaft-floor"><span>7</span></div>
+                    <div class="shaft-floor"><span>6</span></div>
+                    <div class="shaft-floor"><span>5</span></div>
+                    <div class="shaft-floor"><span>4</span></div>
+                    <div class="shaft-floor"><span>3</span></div>
+                    <div class="shaft-floor"><span>2</span></div>
+                    <div class="shaft-floor"><span>1</span></div>
+                </div>
+                <div class="shaft-rails"></div>
+                <div class="cabin-cable"></div>
+                <div class="cabin"></div>
+            </div>
+            <div class="led-display">
+                <span class="led-label">Floor</span>
+                <span class="led-value mono">07</span>
+                <span class="led-arrow"></span>
+            </div>
+            <div class="led-display">
+                <span class="led-label">Status</span>
+                <span class="led-value mono" style="color: var(--ok); text-shadow: 0 0 8px var(--ok-glow);">ONLINE</span>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- ===================== APP ===================== -->
 <!-- 3.2 - Разные клиенты: основной интерфейс с ролевым боковым меню -->
 <div id="app-screen" style="display:none">
     <div class="app-header">
-        <h2>Система управления лифтами <small style="font-size:12px;color:#999;">(Веб)</small></h2>
-        <div style="display:flex;align-items:center;gap:16px;">
+        <div class="app-header-left">
+            <div class="brand-mark" style="width:40px;height:40px;border-radius:11px;">
+                <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+                    <rect x="4" y="3" width="20" height="22" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
+                    <line x1="14" y1="3" x2="14" y2="25" stroke="currentColor" stroke-width="1.4" opacity="0.6"/>
+                    <path d="M9 11 L11 8 L13 11 Z" fill="currentColor"/>
+                    <path d="M19 17 L17 20 L15 17 Z" fill="currentColor" opacity="0.85"/>
+                </svg>
+            </div>
+            <div class="app-header-title">
+                <span class="h-name">ELEVATOR · CONTROL</span>
+                <span class="h-sub">Web client · Live monitoring</span>
+            </div>
+        </div>
+        <div class="app-header-right">
             <div class="user-info" id="user-info"></div>
-            <button onclick="doLogout()">Выйти</button>
+            <button class="btn-icon-ghost" onclick="doLogout()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Выйти
+            </button>
         </div>
     </div>
     <div class="app-body">
@@ -136,7 +981,7 @@
     </div>
 </div>
 
-<!-- MODAL -->
+<!-- ===================== MODAL ===================== -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
     <div class="modal" id="modal-body"></div>
 </div>
@@ -152,7 +997,17 @@ let currentUser = null;
 let currentSection = 'lifts';
 let autoRefreshTimer = null;
 
-// ==================== 3.1 - API HELPERS: единый интерфейс запросов к бэкенду ====================
+// ========= SVG-иконки навигации =========
+const NAV_ICONS = {
+    lifts:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><path d="M7.5 9 L9 6.5 L10.5 9 Z" fill="currentColor"/><path d="M16.5 15 L15 17.5 L13.5 15 Z" fill="currentColor"/></svg>',
+    sensors:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v2 M12 19v2 M3 12h2 M19 12h2"/></svg>',
+    events:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.41 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    requests:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h6 M9 12h6 M9 16h4"/></svg>',
+    technicians: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.66 5.66l-6.04 6.04a2 2 0 0 0 2.83 2.83l6.04-6.04a4 4 0 0 0 5.66-5.66Z"/><circle cx="18" cy="6" r="1.5"/></svg>',
+    reports:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><path d="M8 13h6 M8 17h4"/></svg>',
+};
+
+// ==================== 3.1 - API HELPERS ====================
 async function api(method, path, body) {
     const opts = { method, headers: {} };
     if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -191,9 +1046,14 @@ function badge(val) {
 }
 
 // ==================== AUTH ====================
-function showLogin() { document.getElementById('auth-login').style.display=''; document.getElementById('auth-register').style.display='none'; }
-function showRegister() { document.getElementById('auth-login').style.display='none'; document.getElementById('auth-register').style.display=''; }
-function toggleAdminCode() { document.getElementById('admin-code-group').style.display = document.getElementById('reg-role').value==='administrator' ? '' : 'none'; }
+function showLogin()    { document.getElementById('auth-login').style.display = '';   document.getElementById('auth-register').style.display = 'none'; }
+function showRegister() { document.getElementById('auth-login').style.display = 'none'; document.getElementById('auth-register').style.display = '';   }
+function toggleAdminCode() { document.getElementById('admin-code-group').style.display = document.getElementById('reg-role').value === 'administrator' ? '' : 'none'; }
+
+function fillLogin(email, password) {
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-password').value = password;
+}
 
 async function doLogin() {
     try {
@@ -204,7 +1064,7 @@ async function doLogin() {
         token = data.access_token;
         localStorage.setItem('token', token);
         await loadApp();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function doRegister() {
@@ -218,7 +1078,7 @@ async function doRegister() {
         await api('POST', '/auth/register', body);
         showToast('Аккаунт создан! Войдите.', 'success');
         showLogin();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 function doLogout() {
@@ -233,11 +1093,14 @@ function doLogout() {
 async function loadApp() {
     try {
         currentUser = await api('GET', '/auth/me');
-    } catch(e) { doLogout(); return; }
+    } catch (e) { doLogout(); return; }
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = '';
     const roles = currentUser.roles;
-    document.getElementById('user-info').innerHTML = `${currentUser.email} ${roles.map(r => `<span>${r}</span>`).join('')}`;
+    const initial = (currentUser.email || '?').charAt(0).toUpperCase();
+    const rolePills = roles.map(r => `<span class="role-pill">${r}</span>`).join('');
+    document.getElementById('user-info').innerHTML =
+        `<span class="avatar">${initial}</span><span class="email">${currentUser.email}</span>${rolePills}`;
     buildSidebar(roles);
     navigate(currentSection);
     startAutoRefresh();
@@ -256,22 +1119,32 @@ function canAccess(section) {
         technicians: ['dispatcher','administrator'],
         reports: ['technician','administrator','dispatcher'],
     };
-    return (map[section]||[]).some(r => hasRole(r));
+    return (map[section] || []).some(r => hasRole(r));
 }
 
 function buildSidebar(roles) {
     const items = [
-        { id: 'lifts', label: 'Лифты' },
-        { id: 'sensors', label: 'Датчики' },
-        { id: 'events', label: 'Инциденты' },
-        { id: 'requests', label: 'Заявки' },
+        { id: 'lifts',       label: 'Лифты' },
+        { id: 'sensors',     label: 'Датчики' },
+        { id: 'events',      label: 'Инциденты' },
+        { id: 'requests',    label: 'Заявки' },
         { id: 'technicians', label: 'Техники' },
-        { id: 'reports', label: 'Отчёты' },
+        { id: 'reports',     label: 'Отчёты' },
     ];
     const sb = document.getElementById('sidebar');
-    sb.innerHTML = items.filter(i => canAccess(i.id)).map(i =>
-        `<a onclick="navigate('${i.id}')" id="nav-${i.id}">${i.label}</a>`
-    ).join('');
+    const visible = items.filter(i => canAccess(i.id));
+    sb.innerHTML =
+        '<div class="sidebar-section-title">Диспетчерская</div>' +
+        visible.map(i =>
+            `<a onclick="navigate('${i.id}')" id="nav-${i.id}">
+                <span class="nav-ico">${NAV_ICONS[i.id]}</span>
+                <span>${i.label}</span>
+             </a>`
+        ).join('') +
+        `<div class="sidebar-foot">
+            <div class="status-pill"><span class="dot"></span>Канал API · ONLINE</div>
+            <div>Polling: <span class="mono">10s</span></div>
+        </div>`;
 }
 
 function navigate(section) {
@@ -283,36 +1156,33 @@ function navigate(section) {
     (loaders[section] || loaders.lifts)();
 }
 
-// ==================== 3.3 - Синхронизация данных: автообновление каждые 10 сек ====================
+// ==================== 3.3 - Синхронизация данных ====================
 function startAutoRefresh() { stopAutoRefresh(); autoRefreshTimer = setInterval(() => navigate(currentSection), 10000); }
-function stopAutoRefresh() { if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; } }
+function stopAutoRefresh()  { if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; } }
 
 // ==================== MODAL ====================
 function openModal(html) { document.getElementById('modal-body').innerHTML = html; document.getElementById('modal-overlay').classList.add('show'); }
-function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+function closeModal()    { document.getElementById('modal-overlay').classList.remove('show'); }
 
-// ==================== 3.1 - LIFTS: CRUD через единый API /api/v1/lifts ====================
+// ==================== 3.1 - LIFTS ====================
 async function loadLifts() {
     const c = document.getElementById('content');
     try {
         const data = await api('GET', '/lifts?limit=100');
         let addBtn = '';
-        // 3.2 - Разные сценарии: кнопка добавления только для диспетчера и администратора
         if (hasRole('administrator') || hasRole('dispatcher'))
-            addBtn = `<button class="btn btn-primary" onclick="showAddLift()">+ Добавить лифт</button>`;
-        c.innerHTML = `<div class="toolbar"><h3>Лифты</h3>${addBtn}</div>` + liftsTable(data.items);
-        // 3.3 - Синхронизация: подсказка пользователю об автообновлении
-        c.innerHTML += `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек.</p>`;
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); } // 3.4 - Обработка ошибок
+            addBtn = `<button class="btn btn-primary btn-add" onclick="showAddLift()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Добавить лифт</button>`;
+        c.innerHTML = `<div class="toolbar"><h3>Лифты</h3>${addBtn}</div>` + liftsTable(data.items)
+            + `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек</p>`;
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function liftsTable(items) {
-    if (!items.length) return '<p>Нет лифтов</p>';
+    if (!items.length) return '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет лифтов</div>';
     let rows = items.map(l => {
-        // 3.2 - Разные сценарии: кнопки действий зависят от роли пользователя
         let actions = '';
         if (hasRole('administrator') || hasRole('dispatcher')) {
-            actions += `<button class="btn btn-sm btn-primary" onclick="showEditLift(${l.id})">Ред.</button>`;
+            actions += `<button class="btn btn-sm" onclick="showEditLift(${l.id})">Ред.</button>`;
             if (l.is_emergency)
                 actions += `<button class="btn btn-sm btn-success" onclick="restoreLift(${l.id})">Восстановить</button>`;
             actions += `<button class="btn btn-sm btn-warning" onclick="simulateEmergency(${l.id})">Авария</button>`;
@@ -320,30 +1190,30 @@ function liftsTable(items) {
         if (hasRole('administrator'))
             actions += `<button class="btn btn-sm btn-danger" onclick="deleteLift(${l.id})">Удалить</button>`;
         return `<tr>
-            <td>${l.id}</td>
-            <td>${l.model}</td>
+            <td class="id-cell">#${String(l.id).padStart(3,'0')}</td>
+            <td><b>${l.model}</b></td>
             <td>${badge(l.status)}</td>
-            <td>${l.location}</td>
-            <td>${l.is_emergency ? '<span class="emergency">АВАРИЯ</span>' : 'Нет'}</td>
-            <td>${actions}</td>
+            <td style="color:var(--text-2)">${l.location}</td>
+            <td>${l.is_emergency ? '<span class="emergency">Авария</span>' : '<span style="color:var(--text-3);font-size:12px">—</span>'}</td>
+            <td class="actions">${actions}</td>
         </tr>`;
     }).join('');
-    return `<table><tr><th>ID</th><th>Модель</th><th>Статус</th><th>Расположение</th><th>Авария</th><th>Действия</th></tr>${rows}</table>`;
+    return `<table><thead><tr><th>ID</th><th>Модель</th><th>Статус</th><th>Расположение</th><th>Авария</th><th>Действия</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showAddLift() {
     openModal(`<h3>Добавить лифт</h3>
-        <label>Модель</label><input id="m-model">
-        <label>Расположение</label><input id="m-location">
+        <label>Модель</label><input id="m-model" placeholder="например, Otis Gen2">
+        <label>Расположение</label><input id="m-location" placeholder="ул. Ленина, 12, под. 1">
         <label>Статус</label><select id="m-status"><option value="active">Активен</option><option value="stopped">Остановлен</option><option value="maintenance">Обслуживание</option></select>
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addLift()">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addLift()">Создать</button></div>`);
 }
 
 async function addLift() {
     try {
         await api('POST', '/lifts', { model: document.getElementById('m-model').value, location: document.getElementById('m-location').value, status: document.getElementById('m-status').value });
         closeModal(); showToast('Лифт добавлен', 'success'); loadLifts();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditLift(id) {
@@ -353,35 +1223,35 @@ async function showEditLift(id) {
             <label>Модель</label><input id="m-model" value="${l.model}">
             <label>Расположение</label><input id="m-location" value="${l.location}">
             <label>Статус</label><select id="m-status"><option value="active" ${l.status==='active'?'selected':''}>Активен</option><option value="stopped" ${l.status==='stopped'?'selected':''}>Остановлен</option><option value="maintenance" ${l.status==='maintenance'?'selected':''}>Обслуживание</option></select>
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editLift(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editLift(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editLift(id) {
     try {
         await api('PATCH', `/lifts/${id}`, { model: document.getElementById('m-model').value, location: document.getElementById('m-location').value, status: document.getElementById('m-status').value });
         closeModal(); showToast('Лифт обновлён', 'success'); loadLifts();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function deleteLift(id) {
     if (!confirm('Удалить лифт #' + id + '?')) return;
     try { await api('DELETE', `/lifts/${id}`); showToast('Лифт удалён', 'success'); loadLifts(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
 async function restoreLift(id) {
     try { await api('POST', `/lifts/${id}/restore-state`, {}); showToast('Лифт восстановлен', 'success'); loadLifts(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
 async function simulateEmergency(id) {
     if (!confirm('Симулировать аварию на лифте #' + id + '?')) return;
     try { await api('POST', `/lifts/${id}/simulate-critical-emergency`, {}); showToast('Авария симулирована', 'success'); loadLifts(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
-// ==================== 3.1 - SENSORS: CRUD через единый API /api/v1/sensors ====================
+// ==================== 3.1 - SENSORS ====================
 async function loadSensors() {
     const c = document.getElementById('content');
     try {
@@ -389,26 +1259,29 @@ async function loadSensors() {
         let html = '<div class="toolbar"><h3>Датчики</h3></div>';
         for (const l of lifts.items) {
             const sensors = await api('GET', `/lifts/${l.id}/sensors`);
-            html += `<h4 style="margin:12px 0 6px;">Лифт #${l.id} — ${l.model}</h4>`;
-            if (!sensors.length) { html += '<p style="font-size:13px;color:#999;">Нет датчиков</p>'; continue; }
+            html += `<div class="lift-section-title">
+                <span class="ico">${NAV_ICONS.lifts}</span>
+                <span>Лифт <span class="ico-num">#${String(l.id).padStart(3,'0')}</span> — ${l.model}</span>
+            </div>`;
+            if (!sensors.length) { html += '<div class="panel" style="padding:14px;color:var(--text-3);font-size:13px">Нет датчиков</div>'; continue; }
             let addBtn = '';
             if (hasRole('administrator') || hasRole('dispatcher'))
-                addBtn = `<button class="btn btn-sm btn-primary" onclick="showAddSensor(${l.id})" style="margin-bottom:6px;">+ Датчик</button>`;
+                addBtn = `<div style="margin-bottom:8px"><button class="btn btn-primary btn-sm" onclick="showAddSensor(${l.id})">+ Датчик</button></div>`;
             html += addBtn;
-            html += `<table><tr><th>ID</th><th>Тип</th><th>Значение</th><th>Порог</th><th>Зона</th><th>Действия</th></tr>`;
+            html += `<table><thead><tr><th>ID</th><th>Тип</th><th>Значение</th><th>Порог</th><th>Зона</th><th>Действия</th></tr></thead><tbody>`;
             for (const s of sensors) {
                 const ratio = s.current_value / s.threshold_norm;
                 const zone = ratio <= 1 ? badge('active') : ratio <= 1.2 ? badge('warning') : badge('critical');
                 let actions = '';
                 if (hasRole('administrator') || hasRole('dispatcher'))
-                    actions = `<button class="btn btn-sm btn-primary" onclick="showEditSensor(${s.id})">Ред.</button><button class="btn btn-sm btn-danger" onclick="deleteSensor(${s.id},${l.id})">Удалить</button>`;
-                html += `<tr><td>${s.id}</td><td>${s.sensor_type}</td><td>${s.current_value.toFixed(2)}</td><td>${s.threshold_norm}</td><td>${zone}</td><td>${actions}</td></tr>`;
+                    actions = `<button class="btn btn-sm" onclick="showEditSensor(${s.id})">Ред.</button><button class="btn btn-sm btn-danger" onclick="deleteSensor(${s.id},${l.id})">Удалить</button>`;
+                html += `<tr><td class="id-cell">#${s.id}</td><td><b>${s.sensor_type}</b></td><td class="mono">${s.current_value.toFixed(2)}</td><td class="mono" style="color:var(--text-2)">${s.threshold_norm}</td><td>${zone}</td><td class="actions">${actions}</td></tr>`;
             }
-            html += '</table>';
+            html += '</tbody></table>';
         }
-        html += `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек.</p>`;
+        html += `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек</p>`;
         c.innerHTML = html;
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); }
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function showAddSensor(liftId) {
@@ -416,14 +1289,14 @@ function showAddSensor(liftId) {
         <label>Тип датчика</label><input id="m-stype" placeholder="temperature / door / overload">
         <label>Начальное значение</label><input id="m-sval" type="number" value="0">
         <label>Пороговое значение</label><input id="m-sthresh" type="number" value="50">
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addSensor(${liftId})">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addSensor(${liftId})">Создать</button></div>`);
 }
 
 async function addSensor(liftId) {
     try {
         await api('POST', `/lifts/${liftId}/sensors`, { sensor_type: document.getElementById('m-stype').value, current_value: +document.getElementById('m-sval').value, threshold_norm: +document.getElementById('m-sthresh').value });
         closeModal(); showToast('Датчик добавлен', 'success'); loadSensors();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditSensor(id) {
@@ -433,45 +1306,45 @@ async function showEditSensor(id) {
             <label>Тип</label><input id="m-stype" value="${s.sensor_type}">
             <label>Значение</label><input id="m-sval" type="number" value="${s.current_value}">
             <label>Порог</label><input id="m-sthresh" type="number" value="${s.threshold_norm}">
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editSensor(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editSensor(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editSensor(id) {
     try {
         await api('PATCH', `/sensors/${id}`, { sensor_type: document.getElementById('m-stype').value, current_value: +document.getElementById('m-sval').value, threshold_norm: +document.getElementById('m-sthresh').value });
         closeModal(); showToast('Датчик обновлён', 'success'); loadSensors();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function deleteSensor(id, liftId) {
     if (!confirm('Удалить датчик #' + id + '?')) return;
     try { await api('DELETE', `/sensors/${id}`); showToast('Датчик удалён', 'success'); loadSensors(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
-// ==================== 3.1 - EVENTS: CRUD через единый API /api/v1/events ====================
+// ==================== 3.1 - EVENTS ====================
 async function loadEvents() {
     const c = document.getElementById('content');
     try {
         const data = await api('GET', '/events?limit=100');
         let addBtn = '';
         if (hasRole('dispatcher') || hasRole('administrator'))
-            addBtn = `<button class="btn btn-primary" onclick="showAddEvent()">+ Создать инцидент</button>`;
-        c.innerHTML = `<div class="toolbar"><h3>Инциденты</h3>${addBtn}</div>` + eventsTable(data.items);
-        c.innerHTML += `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек.</p>`;
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); }
+            addBtn = `<button class="btn btn-primary btn-add" onclick="showAddEvent()">+ Создать инцидент</button>`;
+        c.innerHTML = `<div class="toolbar"><h3>Инциденты</h3>${addBtn}</div>` + eventsTable(data.items)
+            + `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек</p>`;
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function eventsTable(items) {
-    if (!items.length) return '<p>Нет инцидентов</p>';
+    if (!items.length) return '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет инцидентов</div>';
     let rows = items.map(ev => {
         let actions = '';
         if (hasRole('dispatcher') || hasRole('administrator'))
-            actions = `<button class="btn btn-sm btn-primary" onclick="showEditEvent(${ev.id})">Ред.</button>`;
-        return `<tr><td>${ev.id}</td><td>${ev.lift_id}</td><td>${badge(ev.event_type)}</td><td>${ev.description}</td><td>${badge(ev.status)}</td><td>${actions}</td></tr>`;
+            actions = `<button class="btn btn-sm" onclick="showEditEvent(${ev.id})">Ред.</button>`;
+        return `<tr><td class="id-cell">#${ev.id}</td><td class="id-cell">#${ev.lift_id}</td><td>${badge(ev.event_type)}</td><td>${ev.description}</td><td>${badge(ev.status)}</td><td class="actions">${actions}</td></tr>`;
     }).join('');
-    return `<table><tr><th>ID</th><th>Лифт</th><th>Тип</th><th>Описание</th><th>Статус</th><th>Действия</th></tr>${rows}</table>`;
+    return `<table><thead><tr><th>ID</th><th>Лифт</th><th>Тип</th><th>Описание</th><th>Статус</th><th>Действия</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showAddEvent() {
@@ -479,14 +1352,14 @@ function showAddEvent() {
         <label>ID лифта</label><input id="m-elift" type="number">
         <label>Тип</label><select id="m-etype"><option value="warning">Предупреждение</option><option value="critical">Критический</option></select>
         <label>Описание</label><textarea id="m-edesc"></textarea>
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addEvent()">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addEvent()">Создать</button></div>`);
 }
 
 async function addEvent() {
     try {
         await api('POST', '/events', { lift_id: +document.getElementById('m-elift').value, event_type: document.getElementById('m-etype').value, description: document.getElementById('m-edesc').value });
         closeModal(); showToast('Инцидент создан', 'success'); loadEvents();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditEvent(id) {
@@ -495,55 +1368,55 @@ async function showEditEvent(id) {
         openModal(`<h3>Редактировать инцидент #${id}</h3>
             <label>Статус</label><select id="m-estatus"><option value="new" ${ev.status==='new'?'selected':''}>Новое</option><option value="in_progress" ${ev.status==='in_progress'?'selected':''}>В работе</option><option value="resolved" ${ev.status==='resolved'?'selected':''}>Решено</option></select>
             <label>Описание</label><textarea id="m-edesc">${ev.description}</textarea>
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editEvent(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editEvent(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editEvent(id) {
     try {
         await api('PATCH', `/events/${id}`, { status: document.getElementById('m-estatus').value, description: document.getElementById('m-edesc').value });
         closeModal(); showToast('Инцидент обновлён', 'success'); loadEvents();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
-// ==================== 3.1 - SERVICE REQUESTS: CRUD через единый API /api/v1/service-requests ====================
+// ==================== 3.1 - SERVICE REQUESTS ====================
 async function loadRequests() {
     const c = document.getElementById('content');
     try {
         const data = await api('GET', '/service-requests?limit=100');
         let addBtn = '';
         if (hasRole('dispatcher') || hasRole('administrator'))
-            addBtn = `<button class="btn btn-primary" onclick="showAddRequest()">+ Создать заявку</button>`;
-        c.innerHTML = `<div class="toolbar"><h3>Заявки на обслуживание</h3>${addBtn}</div>` + requestsTable(data.items);
-        c.innerHTML += `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек.</p>`;
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); }
+            addBtn = `<button class="btn btn-primary btn-add" onclick="showAddRequest()">+ Создать заявку</button>`;
+        c.innerHTML = `<div class="toolbar"><h3>Заявки на обслуживание</h3>${addBtn}</div>` + requestsTable(data.items)
+            + `<p class="refresh-hint">Данные обновляются автоматически каждые 10 сек</p>`;
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function requestsTable(items) {
-    if (!items.length) return '<p>Нет заявок</p>';
+    if (!items.length) return '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет заявок</div>';
     let rows = items.map(r => {
         let actions = '';
         if (hasRole('dispatcher') || hasRole('administrator') || hasRole('technician'))
-            actions = `<button class="btn btn-sm btn-primary" onclick="showEditRequest(${r.id})">Ред.</button>`;
+            actions = `<button class="btn btn-sm" onclick="showEditRequest(${r.id})">Ред.</button>`;
         if (hasRole('administrator'))
             actions += `<button class="btn btn-sm btn-danger" onclick="deleteRequest(${r.id})">Удалить</button>`;
-        return `<tr><td>${r.id}</td><td>${r.lift_id}</td><td>${r.reason}</td><td>${badge(r.status)}</td><td>${r.technician_id || '—'}</td><td>${actions}</td></tr>`;
+        return `<tr><td class="id-cell">#${r.id}</td><td class="id-cell">#${r.lift_id}</td><td>${r.reason}</td><td>${badge(r.status)}</td><td class="id-cell">${r.technician_id ? '#' + r.technician_id : '—'}</td><td class="actions">${actions}</td></tr>`;
     }).join('');
-    return `<table><tr><th>ID</th><th>Лифт</th><th>Причина</th><th>Статус</th><th>Техник ID</th><th>Действия</th></tr>${rows}</table>`;
+    return `<table><thead><tr><th>ID</th><th>Лифт</th><th>Причина</th><th>Статус</th><th>Техник</th><th>Действия</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showAddRequest() {
     openModal(`<h3>Создать заявку</h3>
         <label>ID лифта</label><input id="m-rlift" type="number">
         <label>Причина</label><textarea id="m-rreason"></textarea>
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addRequest()">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addRequest()">Создать</button></div>`);
 }
 
 async function addRequest() {
     try {
         await api('POST', '/service-requests', { lift_id: +document.getElementById('m-rlift').value, reason: document.getElementById('m-rreason').value });
         closeModal(); showToast('Заявка создана', 'success'); loadRequests();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditRequest(id) {
@@ -553,8 +1426,8 @@ async function showEditRequest(id) {
             <label>Статус</label><select id="m-rstatus"><option value="pending" ${r.status==='pending'?'selected':''}>Ожидает</option><option value="assigned" ${r.status==='assigned'?'selected':''}>Назначена</option><option value="in_progress" ${r.status==='in_progress'?'selected':''}>В работе</option><option value="completed" ${r.status==='completed'?'selected':''}>Завершена</option><option value="cancelled" ${r.status==='cancelled'?'selected':''}>Отменена</option></select>
             <label>ID техника (необязательно)</label><input id="m-rtech" type="number" value="${r.technician_id || ''}">
             <label>Причина</label><textarea id="m-rreason">${r.reason}</textarea>
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editRequest(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editRequest(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editRequest(id) {
@@ -564,51 +1437,51 @@ async function editRequest(id) {
         if (techVal) body.technician_id = +techVal;
         await api('PATCH', `/service-requests/${id}`, body);
         closeModal(); showToast('Заявка обновлена', 'success'); loadRequests();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function deleteRequest(id) {
     if (!confirm('Удалить заявку #' + id + '?')) return;
     try { await api('DELETE', `/service-requests/${id}`); showToast('Заявка удалена', 'success'); loadRequests(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
-// ==================== 3.1 - TECHNICIANS: CRUD через единый API /api/v1/technicians ====================
+// ==================== 3.1 - TECHNICIANS ====================
 async function loadTechnicians() {
     const c = document.getElementById('content');
     try {
         const data = await api('GET', '/technicians?limit=100');
         let addBtn = '';
         if (hasRole('administrator') || hasRole('dispatcher'))
-            addBtn = `<button class="btn btn-primary" onclick="showAddTechnician()">+ Добавить техника</button>`;
+            addBtn = `<button class="btn btn-primary btn-add" onclick="showAddTechnician()">+ Добавить техника</button>`;
         c.innerHTML = `<div class="toolbar"><h3>Техники</h3>${addBtn}</div>` + techniciansTable(data.items);
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); }
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function techniciansTable(items) {
-    if (!items.length) return '<p>Нет техников</p>';
+    if (!items.length) return '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет техников</div>';
     let rows = items.map(t => {
         let actions = '';
         if (hasRole('administrator') || hasRole('dispatcher'))
-            actions = `<button class="btn btn-sm btn-primary" onclick="showEditTechnician(${t.id})">Ред.</button>`;
+            actions = `<button class="btn btn-sm" onclick="showEditTechnician(${t.id})">Ред.</button>`;
         if (hasRole('administrator'))
             actions += `<button class="btn btn-sm btn-danger" onclick="deleteTechnician(${t.id})">Удалить</button>`;
-        return `<tr><td>${t.id}</td><td>${t.name}</td><td>${badge(t.status)}</td><td>${actions}</td></tr>`;
+        return `<tr><td class="id-cell">#${t.id}</td><td><b>${t.name}</b></td><td>${badge(t.status)}</td><td class="actions">${actions}</td></tr>`;
     }).join('');
-    return `<table><tr><th>ID</th><th>Имя</th><th>Статус</th><th>Действия</th></tr>${rows}</table>`;
+    return `<table><thead><tr><th>ID</th><th>Имя</th><th>Статус</th><th>Действия</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showAddTechnician() {
     openModal(`<h3>Добавить техника</h3>
         <label>ФИО</label><input id="m-tname">
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addTechnician()">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addTechnician()">Создать</button></div>`);
 }
 
 async function addTechnician() {
     try {
         await api('POST', '/technicians', { name: document.getElementById('m-tname').value });
         closeModal(); showToast('Техник добавлен', 'success'); loadTechnicians();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditTechnician(id) {
@@ -617,44 +1490,44 @@ async function showEditTechnician(id) {
         openModal(`<h3>Редактировать техника #${id}</h3>
             <label>ФИО</label><input id="m-tname" value="${t.name}">
             <label>Статус</label><select id="m-tstatus"><option value="free" ${t.status==='free'?'selected':''}>Свободен</option><option value="busy" ${t.status==='busy'?'selected':''}>Занят</option></select>
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editTechnician(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editTechnician(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editTechnician(id) {
     try {
         await api('PATCH', `/technicians/${id}`, { name: document.getElementById('m-tname').value, status: document.getElementById('m-tstatus').value });
         closeModal(); showToast('Техник обновлён', 'success'); loadTechnicians();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function deleteTechnician(id) {
     if (!confirm('Удалить техника #' + id + '?')) return;
     try { await api('DELETE', `/technicians/${id}`); showToast('Техник удалён', 'success'); loadTechnicians(); }
-    catch(e) { showToast(e.message); }
+    catch (e) { showToast(e.message); }
 }
 
-// ==================== 3.1 - REPORTS: CRUD через единый API /api/v1/reports ====================
+// ==================== 3.1 - REPORTS ====================
 async function loadReports() {
     const c = document.getElementById('content');
     try {
         const data = await api('GET', '/reports?limit=100');
         let addBtn = '';
         if (hasRole('technician') || hasRole('administrator') || hasRole('dispatcher'))
-            addBtn = `<button class="btn btn-primary" onclick="showAddReport()">+ Создать отчёт</button>`;
+            addBtn = `<button class="btn btn-primary btn-add" onclick="showAddReport()">+ Создать отчёт</button>`;
         c.innerHTML = `<div class="toolbar"><h3>Отчёты</h3>${addBtn}</div>` + reportsTable(data.items);
-    } catch(e) { c.innerHTML = `<p>Ошибка: ${e.message}</p>`; showToast(e.message); }
+    } catch (e) { c.innerHTML = `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`; showToast(e.message); }
 }
 
 function reportsTable(items) {
-    if (!items.length) return '<p>Нет отчётов</p>';
+    if (!items.length) return '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет отчётов</div>';
     let rows = items.map(r => {
         let actions = '';
         if (hasRole('administrator') || hasRole('technician') || hasRole('dispatcher'))
-            actions = `<button class="btn btn-sm btn-primary" onclick="showEditReport(${r.id})">Ред.</button>`;
-        return `<tr><td>${r.id}</td><td>${r.service_request_id}</td><td>${r.work_description}</td><td>${badge(r.final_lift_status)}</td><td>${r.created_at ? new Date(r.created_at).toLocaleString('ru') : ''}</td><td>${actions}</td></tr>`;
+            actions = `<button class="btn btn-sm" onclick="showEditReport(${r.id})">Ред.</button>`;
+        return `<tr><td class="id-cell">#${r.id}</td><td class="id-cell">#${r.service_request_id}</td><td>${r.work_description}</td><td>${badge(r.final_lift_status)}</td><td class="mono" style="color:var(--text-2)">${r.created_at ? new Date(r.created_at).toLocaleString('ru') : ''}</td><td class="actions">${actions}</td></tr>`;
     }).join('');
-    return `<table><tr><th>ID</th><th>Заявка</th><th>Описание работ</th><th>Итог. статус</th><th>Дата</th><th>Действия</th></tr>${rows}</table>`;
+    return `<table><thead><tr><th>ID</th><th>Заявка</th><th>Описание работ</th><th>Итог. статус</th><th>Дата</th><th>Действия</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function showAddReport() {
@@ -662,14 +1535,14 @@ function showAddReport() {
         <label>ID заявки</label><input id="m-rrid" type="number">
         <label>Описание работ</label><textarea id="m-rrdesc"></textarea>
         <label>Итоговый статус лифта</label><select id="m-rrstatus"><option value="active">Активен</option><option value="stopped">Остановлен</option><option value="maintenance">Обслуживание</option></select>
-        <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addReport()">Создать</button></div>`);
+        <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addReport()">Создать</button></div>`);
 }
 
 async function addReport() {
     try {
         await api('POST', '/reports', { service_request_id: +document.getElementById('m-rrid').value, work_description: document.getElementById('m-rrdesc').value, final_lift_status: document.getElementById('m-rrstatus').value });
         closeModal(); showToast('Отчёт создан', 'success'); loadReports();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 async function showEditReport(id) {
@@ -678,15 +1551,15 @@ async function showEditReport(id) {
         openModal(`<h3>Редактировать отчёт #${id}</h3>
             <label>Описание работ</label><textarea id="m-rrdesc">${r.work_description}</textarea>
             <label>Итоговый статус лифта</label><select id="m-rrstatus"><option value="active" ${r.final_lift_status==='active'?'selected':''}>Активен</option><option value="stopped" ${r.final_lift_status==='stopped'?'selected':''}>Остановлен</option><option value="maintenance" ${r.final_lift_status==='maintenance'?'selected':''}>Обслуживание</option></select>
-            <div class="modal-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editReport(${id})">Сохранить</button></div>`);
-    } catch(e) { showToast(e.message); }
+            <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="editReport(${id})">Сохранить</button></div>`);
+    } catch (e) { showToast(e.message); }
 }
 
 async function editReport(id) {
     try {
         await api('PATCH', `/reports/${id}`, { work_description: document.getElementById('m-rrdesc').value, final_lift_status: document.getElementById('m-rrstatus').value });
         closeModal(); showToast('Отчёт обновлён', 'success'); loadReports();
-    } catch(e) { showToast(e.message); }
+    } catch (e) { showToast(e.message); }
 }
 
 // ==================== STARTUP ====================

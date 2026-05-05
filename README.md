@@ -115,9 +115,32 @@ python -m uvicorn elevator_control.main:app --reload --port 8000
 
 # 2) Воркер очереди — НУЖЕН для обновления read-модели (4.3.2 и 4.4)
 celery -A elevator_control.infrastructure.celery_app worker --loglevel=info --pool=solo
+
+# 3) (Опционально) демо-аккаунты для всех трёх ролей
+python -m scripts.seed_demo_users
 ```
 
 OpenAPI: `http://localhost:8000/docs`
+
+### 2.5. Демо-аккаунты
+
+Скрипт `scripts/seed_demo_users.py` создаёт (и обновляет) три готовых учётных
+записи — по одной на каждую роль:
+
+| Роль            | Email                          | Пароль            |
+|-----------------|--------------------------------|-------------------|
+| administrator   | `admin@elevator.local`         | `Admin12345`      |
+| dispatcher      | `dispatcher@elevator.local`    | `Dispatch12345`   |
+| technician      | `technician@elevator.local`    | `Technician12345` |
+
+Запуск идемпотентный — можно перезапускать после миграций.
+
+> **Примечание про администратора.** Серверная логика разрешает регистрировать
+> `administrator` через `/api/v1/auth/register` только если: (1) это самый первый
+> пользователь в БД, **или** (2) в payload передан `admin_code`, совпадающий с
+> переменной окружения `ELEVATOR_REGISTRATION_ADMIN_CODE` (по умолчанию в `.env`
+> установлено значение `ADMIN123`). Сидер обходит это, потому что вставляет
+> запись напрямую в БД с уже захешированным паролем (`pbkdf2_sha256`).
 
 ## 3. API описание
 
