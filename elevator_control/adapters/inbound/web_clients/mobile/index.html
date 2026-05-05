@@ -169,8 +169,8 @@
             border: 1px solid rgba(90,209,255,0.18);
         }
         .demo-creds .dc-title {
-            font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--accent-2);
-            text-transform: uppercase; margin-bottom: 8px;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent-2);
+            text-transform: none; margin-bottom: 8px;
         }
         .demo-creds .dc-row {
             display: flex; align-items: center; gap: 8px;
@@ -494,14 +494,14 @@
 
         <div id="m-login-form">
             <label class="field-label" for="ml-email">Email</label>
-            <input class="field" type="email" id="ml-email" placeholder="operator@elevator.local" autocomplete="username">
+            <input class="field" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" id="ml-email" placeholder="operator@elevator.local" autocomplete="username">
             <label class="field-label" for="ml-pass">Пароль</label>
             <input class="field" type="password" id="ml-pass" placeholder="••••••••" autocomplete="current-password">
-            <button class="btn-full" onclick="mLogin()">Войти</button>
+            <button type="button" class="btn-full" onclick="mLogin()">Войти</button>
             <div class="link"><a onclick="mShowReg()">Создать аккаунт</a></div>
 
             <div class="demo-creds">
-                <div class="dc-title">Демо-учётные записи · нажмите для подстановки</div>
+                <div class="dc-title">Демо-аккаунты — клик подставит</div>
                 <div class="dc-row" onclick="mFillLogin('admin@elevator.local','Admin12345')">
                     <span class="dc-role admin">Admin</span>
                     <span class="dc-info">admin@elevator.local · Admin12345</span>
@@ -519,7 +519,7 @@
 
         <div id="m-reg-form" style="display:none">
             <label class="field-label" for="mr-email">Email</label>
-            <input class="field" type="email" id="mr-email" placeholder="new@elevator.local">
+            <input class="field" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" id="mr-email" placeholder="new@elevator.local">
             <label class="field-label" for="mr-pass">Пароль (мин. 8)</label>
             <input class="field" type="password" id="mr-pass" placeholder="••••••••">
             <label class="field-label" for="mr-role">Роль</label>
@@ -537,7 +537,7 @@
                     По умолчанию: <b>ADMIN123</b>. Готовый админ: <b>admin@elevator.local</b> / <b>Admin12345</b>.
                 </div>
             </div>
-            <button class="btn-full" onclick="mRegister()">Зарегистрироваться</button>
+            <button type="button" class="btn-full" onclick="mRegister()">Зарегистрироваться</button>
             <div class="link"><a onclick="mShowLogin()">Уже есть аккаунт</a></div>
         </div>
     </div>
