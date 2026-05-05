@@ -20,32 +20,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-deep:        #0a0e14;
-            --bg-base:        #0f141c;
-            --bg-elev-1:      #161d28;
-            --bg-elev-2:      #1d2532;
-            --bg-elev-3:      #2a3343;
-            --text-1:         #e6edf7;
-            --text-2:         #9aa6b8;
-            --text-3:         #5d6877;
-            --accent:         #5ad1ff;
-            --accent-2:       #7fdcff;
-            --accent-glow:    rgba(90,209,255,0.45);
-            --gold:           #f5b942;
-            --gold-2:         #ffcf6b;
-            --gold-glow:      rgba(245,185,66,0.45);
-            --warn:           #ffb547;
-            --crit:           #ff5969;
-            --crit-glow:      rgba(255,89,105,0.55);
-            --ok:             #4ade80;
-            --ok-glow:        rgba(74,222,128,0.5);
-            --primary:        #4f8cff;
-            --primary-glow:   rgba(79,140,255,0.45);
-            --purple:         #a78bfa;
+            --bg-deep:        #0e1420;
+            --bg-base:        #131a27;
+            --bg-elev-1:      #1a2231;
+            --bg-elev-2:      #212a3b;
+            --bg-elev-3:      #2c3850;
+            --text-1:         #e7edf8;
+            --text-2:         #9faab8;
+            --text-3:         #6b7689;
+            --accent:         #6dd3ff;
+            --accent-2:       #95e0ff;
+            --accent-glow:    rgba(109,211,255,0.32);
+            --gold:           #ecb55a;
+            --gold-2:         #f5cf85;
+            --gold-glow:      rgba(236,181,90,0.32);
+            --warn:           #f1ad58;
+            --crit:           #f06977;
+            --crit-glow:      rgba(240,105,119,0.40);
+            --ok:             #5fd394;
+            --ok-glow:        rgba(95,211,148,0.36);
+            --primary:        #5d8fff;
+            --primary-glow:   rgba(93,143,255,0.32);
+            --purple:         #b39bf2;
             --border:         rgba(255,255,255,0.07);
             --border-strong:  rgba(255,255,255,0.13);
             --hairline:       rgba(255,255,255,0.05);
-            --inset-top:      inset 0 1px 0 rgba(255,255,255,0.08);
+            --inset-top:      inset 0 1px 0 rgba(255,255,255,0.07);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { height: 100%; }
@@ -55,9 +55,9 @@
             color: var(--text-1);
             background: var(--bg-deep);
             background-image:
-                radial-gradient(700px 400px at 0% 0%, rgba(90,209,255,0.10), transparent 60%),
-                radial-gradient(700px 400px at 100% 100%, rgba(79,140,255,0.10), transparent 60%),
-                linear-gradient(180deg, #0a0e14 0%, #0d121a 100%);
+                radial-gradient(700px 400px at 0% 0%, rgba(109,211,255,0.07), transparent 60%),
+                radial-gradient(700px 400px at 100% 100%, rgba(93,143,255,0.07), transparent 60%),
+                linear-gradient(180deg, #0e1420 0%, #131a26 100%);
             background-attachment: fixed;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
@@ -364,19 +364,14 @@
         .emergency-flag {
             display: inline-flex; align-items: center; gap: 5px;
             color: #fff;
-            background: linear-gradient(90deg, #d6394a, #ff5969);
+            background: linear-gradient(90deg, #c85462, #f06977);
             padding: 3px 10px;
             border-radius: 999px;
-            font-weight: 800;
+            font-weight: 700;
             font-size: 11px;
-            letter-spacing: 0.12em;
-            box-shadow: 0 0 14px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.2);
+            letter-spacing: 0.1em;
+            box-shadow: 0 0 12px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.18);
             text-transform: uppercase;
-            animation: emergency-blink 1.2s ease-in-out infinite;
-        }
-        @keyframes emergency-blink {
-            0%, 100% { box-shadow: 0 0 14px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.2); }
-            50%      { box-shadow: 0 0 22px var(--crit-glow), 0 0 4px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.2); }
         }
 
         /* ============= MODAL ============= */
@@ -596,7 +591,7 @@ const API = API_BASE + '/api/v1';
 
 let tk = localStorage.getItem('m_token');
 let me = null;
-let curTab = 'lifts';
+let curTab = localStorage.getItem('m_tab') || 'lifts';
 let refreshTimer = null;
 
 window.addEventListener('error', function (ev) { try { console.error('window.error:', ev.message, ev.error); } catch (_) {} });
@@ -642,13 +637,27 @@ function api(method, path, body) {
                 catch (_) { return reject(new Error('Ответ сервера не является JSON (HTTP ' + status + ')')); }
             }
             if (status >= 200 && status < 300) return resolve(data);
+            const cleanMsg = function (s) {
+                if (typeof s !== 'string') return s;
+                return s
+                    .replace(/^Value error,\s*/i, '')
+                    .replace(/^Assertion (?:failed|error),\s*/i, '')
+                    .replace(/^String should /i, 'Строка должна ')
+                    .replace(/have at least (\d+) characters?/i, 'быть длиной не менее $1 симв.')
+                    .replace(/have at most (\d+) characters?/i, 'быть длиной не более $1 симв.');
+            };
+            const fieldFromLoc = function (loc) {
+                if (!Array.isArray(loc)) return '';
+                const parts = loc.filter(function (p) { return p !== 'body' && p !== 'query' && p !== 'path'; });
+                return parts.length ? '«' + parts.join('.') + '»: ' : '';
+            };
             let msg;
             if (data && typeof data.detail === 'string') msg = data.detail;
             else if (data && Array.isArray(data.detail)) {
                 msg = data.detail.map(function (d) {
                     if (!d) return '';
                     if (typeof d === 'string') return d;
-                    return d.msg || JSON.stringify(d);
+                    return fieldFromLoc(d.loc) + cleanMsg(d.msg || JSON.stringify(d));
                 }).filter(Boolean).join('; ') || ('Ошибка валидации (HTTP ' + status + ')');
             } else msg = 'Ошибка ' + status;
             reject(new Error(msg));
@@ -748,6 +757,7 @@ function buildNav() {
 
 function switchTab(id) {
     curTab = id;
+    try { localStorage.setItem('m_tab', id); } catch (_) {}
     document.querySelectorAll('.bottom-nav a').forEach(a => a.classList.remove('active'));
     const el = document.getElementById('mn-' + id);
     if (el) el.classList.add('active');

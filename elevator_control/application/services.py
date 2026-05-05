@@ -35,8 +35,15 @@ def _not_found(msg: str) -> NotFoundError:
 async def _publish_and_invalidate(session: AsyncSession, *events: ev.DomainEvent) -> None:
     # 4.3.2 Event-очередь: пишем outbox + помечаем сессию для постановки задач после commit.
     # 5.2.3 Кэш: чистим закэшированные query-ответы по агрегатам, затронутым командой.
+    # FIX: Также применяем read-sync ИНЛАЙНОВО в той же транзакции, чтобы система
+    # работала без отдельного Celery worker (которого может не быть в dev/CI).
+    # Celery воркер всё ещё ставится в очередь (для совместимости и логирования),
+    # но при попытке обработать уже processed-событие просто завершит работу.
     if not events:
         return
+    from sqlalchemy import text as _sql_text
+    from elevator_control.application.events.handlers import _apply_event
+
     inserted_ids = await publish(session, list(events))
     pending = session.info.setdefault("pending_event_payloads", [])
     for event, log_id in zip(events, inserted_ids):
@@ -49,9 +56,28 @@ async def _publish_and_invalidate(session: AsyncSession, *events: ev.DomainEvent
                 "log_id": int(log_id),
             }
         )
+        # Inline read-sync: применяем событие к read-модели прямо сейчас, в той же
+        # транзакции. Гарантирует, что после возврата из команды read-side уже видит
+        # изменения — даже если Celery worker не запущен.
+        try:
+            await _apply_event(
+                session, event.event_type, event.aggregate_type, event.aggregate_id
+            )
+            await session.execute(
+                _sql_text(
+                    "UPDATE domain_events_log SET status = 'processed', "
+                    "processed_at = now() WHERE id = :id"
+                ),
+                {"id": int(log_id)},
+            )
+        except Exception:
+            logger.exception(
+                "Inline read-sync failed for event %s/%s — оставляем в очереди",
+                event.event_type, event.aggregate_id,
+            )
     affected_aggregates = {event.aggregate_type for event in events}
     for aggregate in affected_aggregates:
-        # 5.2.3 Кэш: предварительная инвалидация (даже если воркер не отработал).
+        # 5.2.3 Кэш: чистим закэшированные query-ответы.
         await query_cache.invalidate_for_aggregate(aggregate)
 
 

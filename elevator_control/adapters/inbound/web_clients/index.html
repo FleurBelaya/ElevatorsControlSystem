@@ -25,46 +25,41 @@
            объёмные кнопки этажей, скевоморфные индикаторы и LED-табло.
            ============================================================ */
         :root {
-            /* фоны */
-            --bg-deep:        #0a0e14;
-            --bg-base:        #0f141c;
-            --bg-elev-1:      #161d28;
-            --bg-elev-2:      #1d2532;
-            --bg-elev-3:      #2a3343;
-            /* металл (для шлифованных поверхностей панелей) */
-            --metal-1:        #2c3544;
-            --metal-2:        #1a2030;
-            --metal-edge:     #3e4a5d;
-            --metal-rivet:    #4a5566;
-            /* текст */
-            --text-1:         #e6edf7;
-            --text-2:         #9aa6b8;
-            --text-3:         #5d6877;
-            --text-mute:      #4a5563;
-            /* акценты */
-            --accent:         #5ad1ff;     /* электрик-блю — индикатор работы */
-            --accent-2:       #7fdcff;
-            --accent-glow:    rgba(90,209,255,0.45);
-            --gold:           #f5b942;     /* латунь / латунные кнопки */
-            --gold-2:         #ffcf6b;
-            --gold-glow:      rgba(245,185,66,0.45);
-            --warn:           #ffb547;
-            --crit:           #ff5969;
-            --crit-glow:      rgba(255,89,105,0.55);
-            --ok:             #4ade80;
-            --ok-glow:        rgba(74,222,128,0.5);
-            --primary:        #4f8cff;
-            --primary-glow:   rgba(79,140,255,0.45);
-            --purple:         #a78bfa;
-            /* линии и тени */
-            --border:         rgba(255,255,255,0.06);
-            --border-strong:  rgba(255,255,255,0.12);
-            --hairline:       rgba(255,255,255,0.04);
-            --shadow-deep:    0 24px 60px rgba(0,0,0,0.55), 0 6px 18px rgba(0,0,0,0.45);
-            --shadow-card:    0 12px 28px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35);
-            --shadow-soft:    0 6px 18px rgba(0,0,0,0.35);
-            --inset-top:      inset 0 1px 0 rgba(255,255,255,0.08);
-            --inset-bottom:   inset 0 -1px 0 rgba(0,0,0,0.5);
+            /* фоны — на тон светлее, чтобы не «давило» глаз */
+            --bg-deep:        #0e1420;
+            --bg-base:        #131a27;
+            --bg-elev-1:      #1a2231;
+            --bg-elev-2:      #212a3b;
+            --bg-elev-3:      #2c3850;
+            /* текст — мягче белого */
+            --text-1:         #e7edf8;
+            --text-2:         #9faab8;
+            --text-3:         #6b7689;
+            --text-mute:      #525d6f;
+            /* акценты — нежнее, без кислотной яркости */
+            --accent:         #6dd3ff;
+            --accent-2:       #95e0ff;
+            --accent-glow:    rgba(109,211,255,0.32);
+            --gold:           #ecb55a;
+            --gold-2:         #f5cf85;
+            --gold-glow:      rgba(236,181,90,0.32);
+            --warn:           #f1ad58;
+            --crit:           #f06977;
+            --crit-glow:      rgba(240,105,119,0.40);
+            --ok:             #5fd394;
+            --ok-glow:        rgba(95,211,148,0.36);
+            --primary:        #5d8fff;
+            --primary-glow:   rgba(93,143,255,0.32);
+            --purple:         #b39bf2;
+            /* линии и тени — мягче */
+            --border:         rgba(255,255,255,0.07);
+            --border-strong:  rgba(255,255,255,0.13);
+            --hairline:       rgba(255,255,255,0.045);
+            --shadow-deep:    0 22px 50px rgba(0,0,0,0.42), 0 4px 14px rgba(0,0,0,0.32);
+            --shadow-card:    0 8px 22px rgba(0,0,0,0.32), 0 1px 4px rgba(0,0,0,0.26);
+            --shadow-soft:    0 4px 14px rgba(0,0,0,0.26);
+            --inset-top:      inset 0 1px 0 rgba(255,255,255,0.07);
+            --inset-bottom:   inset 0 -1px 0 rgba(0,0,0,0.4);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -75,10 +70,10 @@
             color: var(--text-1);
             background: var(--bg-deep);
             background-image:
-                radial-gradient(1100px 600px at 12% -10%, rgba(90,209,255,0.10), transparent 60%),
-                radial-gradient(900px 500px at 90% 0%, rgba(245,185,66,0.08), transparent 60%),
-                radial-gradient(800px 600px at 50% 110%, rgba(79,140,255,0.10), transparent 60%),
-                linear-gradient(180deg, #0a0e14 0%, #0d121a 100%);
+                radial-gradient(1100px 600px at 12% -10%, rgba(109,211,255,0.08), transparent 60%),
+                radial-gradient(900px 500px at 90% 0%, rgba(236,181,90,0.05), transparent 60%),
+                radial-gradient(800px 600px at 50% 110%, rgba(93,143,255,0.07), transparent 60%),
+                linear-gradient(180deg, #0e1420 0%, #131a26 100%);
             background-attachment: fixed;
             min-height: 100vh;
             overflow-x: hidden;
@@ -720,19 +715,14 @@
 
         .emergency {
             color: #fff;
-            background: linear-gradient(90deg, #d6394a, #ff5969);
+            background: linear-gradient(90deg, #c85462, #f06977);
             padding: 3px 10px;
             border-radius: 999px;
-            font-weight: 800;
+            font-weight: 700;
             font-size: 11px;
-            letter-spacing: 0.12em;
-            box-shadow: 0 0 16px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25);
-            animation: emergency-blink 1.2s ease-in-out infinite;
+            letter-spacing: 0.1em;
+            box-shadow: 0 0 14px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.2);
             text-transform: uppercase;
-        }
-        @keyframes emergency-blink {
-            0%, 100% { box-shadow: 0 0 16px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
-            50%      { box-shadow: 0 0 26px var(--crit-glow), 0 0 4px var(--crit-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
         }
 
         /* ============= MODAL ============= */
@@ -1010,7 +1000,7 @@ const API = API_BASE + '/api/v1';
 
 let token = localStorage.getItem('token');
 let currentUser = null;
-let currentSection = 'lifts';
+let currentSection = localStorage.getItem('section') || 'lifts';
 let autoRefreshTimer = null;
 
 // Глобальный логгер — помогает диагностировать ошибки внутри pywebview/WKWebView.
@@ -1060,6 +1050,21 @@ function api(method, path, body) {
             }
             if (status >= 200 && status < 300) return resolve(data);
             // 3.4 - Обработка ошибок: формируем понятное сообщение
+            const cleanMsg = function (s) {
+                // Убираем технические префиксы Pydantic ("Value error, ...", "Assertion failed, ...")
+                if (typeof s !== 'string') return s;
+                return s
+                    .replace(/^Value error,\s*/i, '')
+                    .replace(/^Assertion (?:failed|error),\s*/i, '')
+                    .replace(/^String should /i, 'Строка должна ')
+                    .replace(/have at least (\d+) characters?/i, 'быть длиной не менее $1 симв.')
+                    .replace(/have at most (\d+) characters?/i, 'быть длиной не более $1 симв.');
+            };
+            const fieldFromLoc = function (loc) {
+                if (!Array.isArray(loc)) return '';
+                const parts = loc.filter(function (p) { return p !== 'body' && p !== 'query' && p !== 'path'; });
+                return parts.length ? '«' + parts.join('.') + '»: ' : '';
+            };
             let msg;
             if (data && typeof data.detail === 'string') {
                 msg = data.detail;
@@ -1067,7 +1072,7 @@ function api(method, path, body) {
                 msg = data.detail.map(function (d) {
                     if (!d) return '';
                     if (typeof d === 'string') return d;
-                    return d.msg || JSON.stringify(d);
+                    return fieldFromLoc(d.loc) + cleanMsg(d.msg || JSON.stringify(d));
                 }).filter(Boolean).join('; ') || ('Ошибка валидации (HTTP ' + status + ')');
             } else {
                 msg = 'Ошибка ' + status;
@@ -1225,6 +1230,7 @@ function buildSidebar(roles) {
 
 function navigate(section) {
     currentSection = section;
+    try { localStorage.setItem('section', section); } catch (_) {}
     document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
     const nav = document.getElementById('nav-' + section);
     if (nav) nav.classList.add('active');

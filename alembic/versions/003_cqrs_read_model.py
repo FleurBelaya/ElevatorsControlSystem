@@ -3,8 +3,8 @@
 # Эта миграция создаёт read-таблицы и заполняет их из write-модели.
 """cqrs read model
 
-Revision ID: 004
-Revises: 003
+Revision ID: 003
+Revises: 002
 Create Date: 2026-05-04
 
 """
@@ -16,8 +16,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "004"
-down_revision: Union[str, None] = "003"
+revision: str = "003"
+down_revision: Union[str, None] = "002"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
