@@ -801,6 +801,223 @@
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 
+        /* ============================================================
+           CONTROL PANEL — кабины + контроллеры
+           ============================================================ */
+        .panels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 22px;
+            margin-top: 8px;
+        }
+        .lift-panel {
+            position: relative;
+            display: grid;
+            grid-template-columns: 132px minmax(0, 1fr);
+            gap: 18px;
+            padding: 18px;
+            background: linear-gradient(160deg, var(--bg-elev-2), var(--bg-elev-1));
+            border: 1px solid var(--border-strong);
+            border-radius: 18px;
+            box-shadow: var(--shadow-card), var(--inset-top);
+            overflow: hidden;
+        }
+        .lift-panel::before {
+            content: '';
+            position: absolute; left: 16px; right: 16px; top: 14px; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
+        }
+        .lift-panel.is-emergency {
+            border-color: rgba(240,105,119,0.5);
+            box-shadow: var(--shadow-card), 0 0 24px rgba(240,105,119,0.18);
+        }
+
+        /* Шахта */
+        .lp-shaft-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .lp-shaft {
+            position: relative;
+            width: 110px;
+            height: 280px;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #060a12 0%, #0d1320 100%);
+            border: 1px solid var(--border);
+            box-shadow: inset 0 8px 24px rgba(0,0,0,0.7);
+            overflow: hidden;
+        }
+        .lp-shaft .lp-rail-l, .lp-shaft .lp-rail-r {
+            position: absolute; top: 8px; bottom: 8px; width: 3px;
+            background: linear-gradient(180deg, #2c3544, #1a2030);
+            box-shadow: inset 1px 0 0 rgba(255,255,255,0.08);
+        }
+        .lp-shaft .lp-rail-l { left: 22px; }
+        .lp-shaft .lp-rail-r { right: 22px; }
+        .lp-shaft .lp-floors {
+            position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+            display: flex; flex-direction: column-reverse;
+            padding: 6px 0;
+        }
+        .lp-shaft .lp-floor {
+            flex: 1;
+            border-bottom: 1px dashed rgba(255,255,255,0.05);
+            display: flex; align-items: center; padding-left: 6px;
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            color: var(--text-3);
+        }
+        .lp-shaft .lp-floor:last-child { border-bottom: 0; }
+        .lp-shaft .lp-floor.target {
+            background: linear-gradient(90deg, rgba(109,211,255,0.1), transparent);
+        }
+
+        .lp-cable {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            top: 0; width: 2px;
+            background: linear-gradient(180deg, transparent, var(--text-3));
+            transition: height 0.95s linear;
+        }
+        .lp-cabin {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            width: 64px; height: 38px;
+            border-radius: 5px;
+            background: linear-gradient(160deg, #3a4658, #1d2535);
+            border: 1px solid var(--border-strong);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.18),
+                inset 0 -2px 6px rgba(0,0,0,0.5),
+                0 4px 10px rgba(0,0,0,0.5);
+            transition: bottom 0.95s linear;
+        }
+        .lp-cabin.lights-on { box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.22),
+            inset 0 0 14px rgba(245,207,133,0.3),
+            inset 0 -2px 6px rgba(0,0,0,0.4),
+            0 4px 12px rgba(0,0,0,0.45),
+            0 0 20px rgba(245,207,133,0.18); }
+        .lp-cabin .lp-doors {
+            position: absolute; left: 6px; right: 6px; top: 5px; bottom: 5px;
+            display: flex; gap: 2px;
+        }
+        .lp-cabin .lp-door {
+            flex: 1;
+            background: linear-gradient(180deg, #4a5566, #2a3343);
+            border-radius: 2px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.4);
+            transition: transform 0.4s cubic-bezier(0.55, 0.06, 0.34, 0.97);
+        }
+        .lp-cabin.doors-open .lp-door:first-child { transform: translateX(-90%); }
+        .lp-cabin.doors-open .lp-door:last-child { transform: translateX(90%); }
+        .lp-cabin.lights-on .lp-doors {
+            background: radial-gradient(ellipse at center, rgba(245,207,133,0.22), transparent 70%);
+        }
+
+        /* LED-табло */
+        .lp-led {
+            display: flex; align-items: center; justify-content: space-between;
+            background: linear-gradient(180deg, #060a10, #0a1018);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            min-width: 96px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.7);
+        }
+        .lp-led .lp-led-num {
+            font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px;
+            color: var(--gold-2); letter-spacing: 0.05em;
+            text-shadow: 0 0 6px var(--gold-glow);
+        }
+        .lp-led .lp-led-arrow { width: 0; height: 0; }
+        .lp-led .lp-led-arrow.up   { border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); }
+        .lp-led .lp-led-arrow.down { border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--accent); filter: drop-shadow(0 0 4px var(--accent-glow)); }
+        .lp-led .lp-led-arrow.idle { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+
+        /* Информация и контролы */
+        .lp-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+        .lp-info-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .lp-info-head .lp-title { min-width: 0; }
+        .lp-info-head .lp-title b { display: block; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lp-info-head .lp-title small { display: block; font-size: 11px; color: var(--text-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Кнопки этажей — выпуклые «лифтовые» */
+        .lp-floor-buttons {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(36px, 1fr)); gap: 6px;
+            margin-top: 4px;
+        }
+        .lp-fbtn {
+            position: relative;
+            display: inline-flex; align-items: center; justify-content: center;
+            height: 32px;
+            font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px;
+            color: var(--text-1);
+            background: radial-gradient(circle at 30% 25%, var(--bg-elev-3), var(--bg-elev-1));
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: var(--inset-top), 0 2px 4px rgba(0,0,0,0.4);
+            transition: transform .12s, box-shadow .12s, color .12s, background .15s;
+        }
+        .lp-fbtn:hover { color: var(--accent-2); }
+        .lp-fbtn:active { transform: translateY(1px); box-shadow: var(--inset-top), 0 1px 2px rgba(0,0,0,0.4); }
+        .lp-fbtn.current {
+            color: var(--gold-2);
+            background: radial-gradient(circle at 30% 25%, #3a3120, #221a08);
+            border-color: rgba(236,181,90,0.5);
+            box-shadow: var(--inset-top), 0 0 12px var(--gold-glow), 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .lp-fbtn.target {
+            color: var(--accent);
+            background: radial-gradient(circle at 30% 25%, #1a2c3a, #0c1822);
+            border-color: rgba(109,211,255,0.45);
+            box-shadow: var(--inset-top), 0 0 12px var(--accent-glow), 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        /* Тогглы (двери, свет) */
+        .lp-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .lp-toggle {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 10px;
+            font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
+            background: linear-gradient(180deg, var(--bg-elev-3), var(--bg-elev-2));
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-1);
+            box-shadow: var(--inset-top);
+            transition: filter .12s, transform .12s;
+        }
+        .lp-toggle:hover { filter: brightness(1.1); }
+        .lp-toggle:active { transform: translateY(1px); }
+        .lp-toggle .lp-led-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--text-3);
+            box-shadow: 0 0 4px var(--text-3);
+        }
+        .lp-toggle.is-on .lp-led-dot { background: var(--ok); box-shadow: 0 0 8px var(--ok-glow); }
+        .lp-toggle.is-warn .lp-led-dot { background: var(--warn); box-shadow: 0 0 8px rgba(241,173,88,0.5); }
+        .lp-stop {
+            background: linear-gradient(180deg, #c85462, #8e2c39);
+            border-color: rgba(240,105,119,0.55);
+            color: #fff;
+            font-weight: 700;
+            box-shadow: var(--inset-top), 0 4px 10px rgba(240,105,119,0.3);
+        }
+
+        /* Сенсор-чипы */
+        .lp-sensors { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+        .lp-sensor-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 10.5px;
+            color: var(--text-2);
+        }
+        .lp-sensor-chip::before {
+            content: ''; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 4px var(--ok-glow);
+        }
+        .lp-sensor-chip.warn::before { background: var(--warn); box-shadow: 0 0 6px rgba(241,173,88,0.5); }
+        .lp-sensor-chip.crit::before { background: var(--crit); box-shadow: 0 0 6px var(--crit-glow); }
+
         /* === wide screen polish === */
         @media (min-width: 1400px) { .content { padding: 28px 36px 50px; } }
         @media (max-width: 720px) {
@@ -1013,6 +1230,7 @@ window.addEventListener('unhandledrejection', function (ev) {
 
 // ========= SVG-иконки навигации =========
 const NAV_ICONS = {
+    panel:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.4" fill="currentColor"/><circle cx="15" cy="10" r="1.4" fill="currentColor"/><path d="M7 15h10"/></svg>',
     lifts:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><path d="M7.5 9 L9 6.5 L10.5 9 Z" fill="currentColor"/><path d="M16.5 15 L15 17.5 L13.5 15 Z" fill="currentColor"/></svg>',
     sensors:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v2 M12 19v2 M3 12h2 M19 12h2"/></svg>',
     events:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.86 L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.41 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
@@ -1193,6 +1411,7 @@ function canAccess(section) {
     if (hasRole('administrator')) return true;
     // 3.2 - Маппинг разделов к ролям: каждая роль видит только свои разделы
     const map = {
+        panel: ['dispatcher','administrator'],
         lifts: ['dispatcher','administrator'],
         sensors: ['dispatcher','administrator'],
         events: ['dispatcher','technician','administrator'],
@@ -1205,6 +1424,7 @@ function canAccess(section) {
 
 function buildSidebar(roles) {
     const items = [
+        { id: 'panel',       label: 'Пульт' },
         { id: 'lifts',       label: 'Лифты' },
         { id: 'sensors',     label: 'Датчики' },
         { id: 'events',      label: 'Инциденты' },
@@ -1234,17 +1454,212 @@ function navigate(section) {
     document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
     const nav = document.getElementById('nav-' + section);
     if (nav) nav.classList.add('active');
-    const loaders = { lifts: loadLifts, sensors: loadSensors, events: loadEvents, requests: loadRequests, technicians: loadTechnicians, reports: loadReports };
+    const loaders = { panel: loadPanel, lifts: loadLifts, sensors: loadSensors, events: loadEvents, requests: loadRequests, technicians: loadTechnicians, reports: loadReports };
     (loaders[section] || loaders.lifts)();
+    startAutoRefresh();
 }
 
 // ==================== 3.3 - Синхронизация данных ====================
-function startAutoRefresh() { stopAutoRefresh(); autoRefreshTimer = setInterval(() => navigate(currentSection), 10000); }
+// Для большинства секций — обновление через navigate() каждые 10s,
+// для пульта — мягкое in-place обновление каждую секунду (анимация кабины).
+function startAutoRefresh() {
+    stopAutoRefresh();
+    if (currentSection === 'panel') {
+        autoRefreshTimer = setInterval(refreshPanel, 1000);
+    } else {
+        autoRefreshTimer = setInterval(() => navigate(currentSection), 10000);
+    }
+}
 function stopAutoRefresh()  { if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; } }
 
 // ==================== MODAL ====================
 function openModal(html) { document.getElementById('modal-body').innerHTML = html; document.getElementById('modal-overlay').classList.add('show'); }
 function closeModal()    { document.getElementById('modal-overlay').classList.remove('show'); }
+
+// ==================== ПУЛЬТ ДИСТАНЦИОННОГО УПРАВЛЕНИЯ ====================
+// Кабины + контроллеры для admin/dispatcher.
+// Файлы бэкенда:
+//   elevator_control/adapters/inbound/api/v1/control.py
+//   elevator_control/application/lift_panel.py
+//   alembic/versions/004_lift_runtime.py
+async function loadPanel() {
+    const c = document.getElementById('content');
+    c.innerHTML = `<div class="toolbar"><h3>Пульт управления</h3>
+        <span class="refresh-hint" style="margin-top:0">Кабины обновляются каждую секунду</span>
+    </div><div id="panels-grid" class="panels-grid"></div>`;
+    try {
+        const panels = await api('GET', '/lifts/panels');
+        renderPanelGrid(panels);
+    } catch (e) {
+        c.innerHTML += `<div class="panel" style="padding:18px;color:#ffd0d6">${e.message}</div>`;
+        showToast(e.message);
+    }
+}
+
+function renderPanelGrid(panels) {
+    const grid = document.getElementById('panels-grid');
+    if (!grid) return;
+    if (!panels || !panels.length) {
+        grid.innerHTML = '<div class="panel" style="padding:24px;color:var(--text-3);text-align:center">Нет лифтов</div>';
+        return;
+    }
+    grid.innerHTML = panels.map(p => renderPanelCard(p)).join('');
+}
+
+function renderPanelCard(p) {
+    const total = p.total_floors || 9;
+    const floorsHtml = [];
+    for (let f = total; f >= 1; f--) {
+        floorsHtml.push(`<div class="lp-floor"><span>${f}</span></div>`);
+    }
+    const buttonsHtml = [];
+    for (let f = 1; f <= total; f++) {
+        const cls = f === p.current_floor ? 'current' : (f === p.target_floor && p.target_floor !== p.current_floor ? 'target' : '');
+        buttonsHtml.push(`<button class="lp-fbtn ${cls}" data-floor="${f}" onclick="liftMoveTo(${p.lift_id}, ${f})">${f}</button>`);
+    }
+    const arrowCls = p.direction === 'up' ? 'up' : (p.direction === 'down' ? 'down' : 'idle');
+    const cabinPos = liftCabinPosition(p.current_floor, total);
+    const cabinClasses = ['lp-cabin'];
+    if (p.doors_open) cabinClasses.push('doors-open');
+    if (p.lights_on) cabinClasses.push('lights-on');
+    const sensorsHtml = (p.sensors || []).map(s => {
+        const cls = s.ratio > 1.2 ? 'crit' : (s.ratio > 1 ? 'warn' : '');
+        return `<span class="lp-sensor-chip ${cls}">${s.sensor_type}: ${s.current_value.toFixed(1)}/${s.threshold_norm}</span>`;
+    }).join('');
+    const emergencyCls = p.is_emergency ? 'is-emergency' : '';
+    return `<div class="lift-panel ${emergencyCls}" data-lift-id="${p.lift_id}">
+        <div class="lp-shaft-wrap">
+            <div class="lp-shaft">
+                <div class="lp-rail-l"></div><div class="lp-rail-r"></div>
+                <div class="lp-floors">${floorsHtml.join('')}</div>
+                <div class="lp-cable" style="height:${100 - cabinPos.bottom}%"></div>
+                <div class="${cabinClasses.join(' ')}" style="bottom:${cabinPos.bottom}%">
+                    <div class="lp-doors"><div class="lp-door"></div><div class="lp-door"></div></div>
+                </div>
+            </div>
+            <div class="lp-led">
+                <span class="lp-led-num">${String(p.current_floor).padStart(2,'0')}</span>
+                <span class="lp-led-arrow ${arrowCls}"></span>
+            </div>
+        </div>
+        <div class="lp-info">
+            <div class="lp-info-head">
+                <div class="lp-title">
+                    <b>${p.model}</b>
+                    <small>#${String(p.lift_id).padStart(3,'0')} · ${p.location}</small>
+                </div>
+                ${badge(p.status)}
+            </div>
+            <div class="lp-floor-buttons">${buttonsHtml.join('')}</div>
+            <div class="lp-row">
+                <button class="lp-toggle ${p.doors_open?'is-warn':''}" onclick="liftToggleDoors(${p.lift_id}, ${!p.doors_open})">
+                    <span class="lp-led-dot"></span>${p.doors_open ? 'Закрыть двери' : 'Открыть двери'}
+                </button>
+                <button class="lp-toggle ${p.lights_on?'is-on':''}" onclick="liftToggleLights(${p.lift_id}, ${!p.lights_on})">
+                    <span class="lp-led-dot"></span>Свет ${p.lights_on ? 'вкл' : 'выкл'}
+                </button>
+                <button class="lp-toggle lp-stop" onclick="liftStop(${p.lift_id})">СТОП</button>
+            </div>
+            <div class="lp-sensors">${sensorsHtml || '<span style="font-size:11px;color:var(--text-3)">Нет датчиков</span>'}</div>
+        </div>
+    </div>`;
+}
+
+function liftCabinPosition(floor, total) {
+    // floor [1..total] → bottom % внутри шахты (0% — низ, ~88% — верх)
+    const f = Math.max(1, Math.min(total, floor));
+    const usable = 88;
+    const ratio = (f - 1) / Math.max(1, total - 1);
+    return { bottom: ratio * usable };
+}
+
+async function refreshPanel() {
+    if (currentSection !== 'panel') return;
+    let panels;
+    try { panels = await api('GET', '/lifts/panels'); }
+    catch (e) { return; }  // silent
+    const grid = document.getElementById('panels-grid');
+    if (!grid) return;
+    // Если состав лифтов изменился — перерисовываем целиком.
+    const existingIds = Array.from(grid.querySelectorAll('.lift-panel')).map(el => +el.dataset.liftId).sort();
+    const incomingIds = panels.map(p => p.lift_id).sort();
+    if (existingIds.length !== incomingIds.length || !existingIds.every((v,i) => v === incomingIds[i])) {
+        renderPanelGrid(panels);
+        return;
+    }
+    // In-place update (без перерисовки DOM, чтобы CSS-transition анимировал плавно).
+    panels.forEach(p => {
+        const card = grid.querySelector('.lift-panel[data-lift-id="' + p.lift_id + '"]');
+        if (!card) return;
+        // Кабина: позиция, двери, свет
+        const cabin = card.querySelector('.lp-cabin');
+        const cable = card.querySelector('.lp-cable');
+        const pos = liftCabinPosition(p.current_floor, p.total_floors || 9);
+        if (cabin) {
+            cabin.style.bottom = pos.bottom + '%';
+            cabin.classList.toggle('doors-open', !!p.doors_open);
+            cabin.classList.toggle('lights-on', !!p.lights_on);
+        }
+        if (cable) cable.style.height = (100 - pos.bottom) + '%';
+        // LED-табло
+        const led = card.querySelector('.lp-led-num');
+        if (led) led.textContent = String(p.current_floor).padStart(2,'0');
+        const arr = card.querySelector('.lp-led-arrow');
+        if (arr) {
+            arr.classList.remove('up','down','idle');
+            arr.classList.add(p.direction === 'up' ? 'up' : (p.direction === 'down' ? 'down' : 'idle'));
+        }
+        // Кнопки этажей
+        card.querySelectorAll('.lp-fbtn').forEach(btn => {
+            const f = +btn.dataset.floor;
+            btn.classList.toggle('current', f === p.current_floor);
+            btn.classList.toggle('target', f === p.target_floor && p.target_floor !== p.current_floor);
+        });
+        // Тогглы (двери, свет)
+        const toggles = card.querySelectorAll('.lp-toggle');
+        if (toggles.length >= 2) {
+            const dt = toggles[0]; const lt = toggles[1];
+            dt.classList.toggle('is-warn', !!p.doors_open);
+            dt.lastChild.nodeValue = p.doors_open ? 'Закрыть двери' : 'Открыть двери';
+            dt.setAttribute('onclick', `liftToggleDoors(${p.lift_id}, ${!p.doors_open})`);
+            lt.classList.toggle('is-on', !!p.lights_on);
+            lt.lastChild.nodeValue = 'Свет ' + (p.lights_on ? 'вкл' : 'выкл');
+            lt.setAttribute('onclick', `liftToggleLights(${p.lift_id}, ${!p.lights_on})`);
+        }
+        // Аварийная подсветка
+        card.classList.toggle('is-emergency', !!p.is_emergency);
+    });
+}
+
+async function liftMoveTo(liftId, floor) {
+    try {
+        await api('POST', `/lifts/${liftId}/control/move`, { target_floor: floor });
+        await refreshPanel();
+    } catch (e) { showToast(e.message); }
+}
+
+async function liftToggleDoors(liftId, open_) {
+    try {
+        await api('POST', `/lifts/${liftId}/control/doors`, { open: open_ });
+        await refreshPanel();
+    } catch (e) { showToast(e.message); }
+}
+
+async function liftToggleLights(liftId, on_) {
+    try {
+        await api('POST', `/lifts/${liftId}/control/lights`, { on: on_ });
+        await refreshPanel();
+    } catch (e) { showToast(e.message); }
+}
+
+async function liftStop(liftId) {
+    if (!confirm('Аварийная остановка лифта #' + liftId + '?')) return;
+    try {
+        await api('POST', `/lifts/${liftId}/control/stop`, {});
+        await refreshPanel();
+        showToast('Остановлено', 'success');
+    } catch (e) { showToast(e.message); }
+}
 
 // ==================== 3.1 - LIFTS ====================
 async function loadLifts() {

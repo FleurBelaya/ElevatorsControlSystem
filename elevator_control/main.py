@@ -50,6 +50,21 @@ async def _simulation_tick_once() -> None:
             await run_sensor_simulation_tick(lifts, sensors, events, requests)
 
 
+async def _runtime_tick_loop() -> None:
+    """Быстрый цикл: продвигает кабины лифтов к target_floor каждую секунду."""
+    from elevator_control.application.lift_panel import tick_runtime
+    while True:
+        try:
+            await asyncio.sleep(1.0)
+            async with AsyncSessionLocal() as session:
+                async with session.begin():
+                    await tick_runtime(session)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Ошибка runtime-tick (лифт)")
+
+
 async def _simulation_loop() -> None:
     while True:
         try:
@@ -113,13 +128,16 @@ async def lifespan(app: FastAPI):
     # Автоматический сидинг демо-аккаунтов — упрощает первый запуск.
     await _auto_seed_demo_users()
 
-    task = asyncio.create_task(_simulation_loop())
+    sensor_task = asyncio.create_task(_simulation_loop())
+    runtime_task = asyncio.create_task(_runtime_tick_loop())
     yield
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    for t in (sensor_task, runtime_task):
+        t.cancel()
+    for t in (sensor_task, runtime_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
     await close_pool()
     await engine.dispose()
 

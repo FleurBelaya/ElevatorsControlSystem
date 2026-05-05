@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from elevator_control.adapters.inbound.api.v1 import (
     auth,
+    control,
     events,
     lifts,
     reports,
@@ -13,6 +14,8 @@ from elevator_control.adapters.inbound.api.v1 import (
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth.router)
+# КРИТИЧНО: control должен быть ДО lifts, иначе /lifts/panels попадает в /lifts/{lift_id}.
+api_v1_router.include_router(control.router)
 api_v1_router.include_router(lifts.router)
 api_v1_router.include_router(sensors.router)
 api_v1_router.include_router(sensors.item_router)
