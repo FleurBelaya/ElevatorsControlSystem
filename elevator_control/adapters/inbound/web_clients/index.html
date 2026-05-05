@@ -1509,7 +1509,9 @@ function renderPanelGrid(panels) {
 function renderPanelCard(p) {
     const total = p.total_floors || 9;
     const floorsHtml = [];
-    for (let f = total; f >= 1; f--) {
+    // column-reverse в CSS отображает первый DOM-элемент снизу,
+    // поэтому iter 1..N даёт 1-й этаж внизу, 9-й — наверху (как в реальной шахте).
+    for (let f = 1; f <= total; f++) {
         floorsHtml.push(`<div class="lp-floor"><span>${f}</span></div>`);
     }
     const buttonsHtml = [];
