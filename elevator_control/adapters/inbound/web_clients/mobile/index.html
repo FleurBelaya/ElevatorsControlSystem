@@ -698,10 +698,21 @@ function mFillLogin(email, password) {
 }
 
 async function mLogin() {
+    const email = (document.getElementById('ml-email').value || '').trim();
+    const password = document.getElementById('ml-pass').value || '';
+    if (!email || !password) { toast('Введите email и пароль'); return; }
     try {
-        const d = await api('POST', '/auth/login-json', { email: document.getElementById('ml-email').value, password: document.getElementById('ml-pass').value });
-        tk = d.access_token; localStorage.setItem('m_token', tk); await mInit();
-    } catch (e) { toast(e.message); }
+        const d = await api('POST', '/auth/login-json', { email: email, password: password });
+        tk = d.access_token; localStorage.setItem('m_token', tk);
+        toast('Вход выполнен', true);
+        await mInit();
+    } catch (e) {
+        let msg = e && e.message ? e.message : String(e);
+        if (/неверный логин/i.test(msg) && /elevator\.local$/i.test(email)) {
+            msg += ' · Запустите: python -m scripts.seed_demo_users';
+        }
+        toast(msg);
+    }
 }
 
 async function mRegister() {
@@ -1084,6 +1095,20 @@ async function mInit() {
     switchTab(curTab);
     startRefresh();
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    const bind = function (id, action) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); action(); }
+        });
+    };
+    bind('ml-email', mLogin);
+    bind('ml-pass', mLogin);
+    bind('mr-email', mRegister);
+    bind('mr-pass', mRegister);
+    bind('mr-acode', mRegister);
+});
 
 if (tk) mInit();
 </script>

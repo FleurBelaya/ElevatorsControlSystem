@@ -61,6 +61,38 @@ async def _simulation_loop() -> None:
             logger.exception("Ошибка фоновой симуляции датчиков")
 
 
+async def _auto_seed_demo_users() -> None:
+    """Автоматически создаёт три демо-аккаунта при старте приложения.
+
+    Идемпотентно: если roles ещё не созданы (свежая БД без миграций) —
+    тихо пропускает. Логирует результат.
+    """
+    try:
+        from elevator_control.infrastructure.seed import DEMO_USERS, seed_demo_users
+    except Exception:
+        logger.exception("Авто-сидинг: не удалось импортировать модуль seed")
+        return
+    try:
+        # Проверяем, что миграции применены (есть таблица roles).
+        async with engine.begin() as conn:
+            result = await conn.execute(text("SELECT COUNT(*) FROM roles"))
+            roles_count = int(result.scalar_one())
+        if roles_count == 0:
+            logger.warning(
+                "Авто-сидинг: таблица roles пуста — пропускаю. "
+                "Применили ли вы миграции? alembic upgrade head"
+            )
+            return
+        rows = await seed_demo_users(DEMO_USERS)
+        logger.info(
+            "Авто-сидинг: %d демо-аккаунтов обеспечено — %s",
+            len(rows),
+            ", ".join(f"{email}=#{uid}" for email, uid in rows),
+        )
+    except Exception:
+        logger.exception("Авто-сидинг демо-юзеров не удался (не критично)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -77,6 +109,9 @@ async def lifespan(app: FastAPI):
         await get_pool()
     except Exception:
         logger.exception("4.1.3 не удалось создать asyncpg pool для read-стороны")
+
+    # Автоматический сидинг демо-аккаунтов — упрощает первый запуск.
+    await _auto_seed_demo_users()
 
     task = asyncio.create_task(_simulation_loop())
     yield

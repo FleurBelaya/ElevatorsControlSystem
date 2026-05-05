@@ -1125,15 +1125,22 @@ function fillLogin(email, password) {
 }
 
 async function doLogin() {
+    const email = (document.getElementById('login-email').value || '').trim();
+    const password = document.getElementById('login-password').value || '';
+    if (!email || !password) { showToast('Введите email и пароль'); return; }
     try {
-        const data = await api('POST', '/auth/login-json', {
-            email: document.getElementById('login-email').value,
-            password: document.getElementById('login-password').value
-        });
+        const data = await api('POST', '/auth/login-json', { email: email, password: password });
         token = data.access_token;
         localStorage.setItem('token', token);
+        showToast('Вход выполнен', 'success');
         await loadApp();
-    } catch (e) { showToast(e.message); }
+    } catch (e) {
+        let msg = e && e.message ? e.message : String(e);
+        if (/неверный логин/i.test(msg) && /elevator\.local$/i.test(email)) {
+            msg += ' · Запустите сидер: python -m scripts.seed_demo_users';
+        }
+        showToast(msg);
+    }
 }
 
 async function doRegister() {
@@ -1632,6 +1639,21 @@ async function editReport(id) {
 }
 
 // ==================== STARTUP ====================
+// Enter в полях логина/регистрации запускает соответствующее действие.
+document.addEventListener('DOMContentLoaded', function () {
+    const bind = function (id, action) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); action(); }
+        });
+    };
+    bind('login-email', doLogin);
+    bind('login-password', doLogin);
+    bind('reg-email', doRegister);
+    bind('reg-password', doRegister);
+    bind('reg-admin-code', doRegister);
+});
+
 if (token) loadApp();
 </script>
 </body>
