@@ -547,6 +547,26 @@
         .lpc-tg.on .dot   { background: var(--ok); box-shadow: 0 0 6px var(--ok-glow); }
         .lpc-tg.warn .dot { background: var(--warn); box-shadow: 0 0 6px rgba(241,173,88,0.5); }
         .lpc-tg.stop { background: linear-gradient(180deg, #c85462, #8e2c39); color: #fff; border-color: rgba(240,105,119,0.5); }
+
+        /* Движение кабины */
+        .lpc-cabin.moving { outline: 1px solid rgba(109,211,255,0.4); outline-offset: 1px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 3px 8px rgba(0,0,0,0.5), 0 0 12px rgba(109,211,255,0.2); }
+        .lpc-cabin.moving.lights-on { box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 10px rgba(245,207,133,0.3), 0 3px 8px rgba(0,0,0,0.5), 0 0 16px rgba(245,207,133,0.18), 0 0 10px rgba(109,211,255,0.15); }
+
+        /* Стрела направления в LED */
+        .lpc-arrow { width: 0; height: 0; }
+        .lpc-arrow.up   { border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--accent); filter: drop-shadow(0 0 4px rgba(109,211,255,0.6)); animation: m-blink 0.8s ease-in-out infinite; }
+        .lpc-arrow.down { border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--accent); filter: drop-shadow(0 0 4px rgba(109,211,255,0.6)); animation: m-blink 0.8s ease-in-out infinite; }
+        .lpc-arrow.idle { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+        @keyframes m-blink { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+        /* Строка статуса под LED */
+        .lpc-status { font-size: 10px; color: var(--text-2); letter-spacing: 0.05em; }
+        .lpc-status.moving { color: var(--accent); }
+        .lpc-status.doors  { color: var(--warn); }
+        .lpc-status.emerg  { color: var(--crit); }
+
+        /* Аварийная подсветка карточки */
+        .lift-panel-card.is-emergency { border-color: rgba(240,105,119,0.5); box-shadow: 0 8px 18px rgba(0,0,0,0.35), 0 0 20px rgba(240,105,119,0.15), var(--inset-top); }
     </style>
 </head>
 <body>
@@ -919,26 +939,40 @@ function mRenderPanels(panels) {
     wrap.innerHTML = panels.map(p => mPanelCard(p)).join('');
 }
 
+function mStatusInfo(p) {
+    if (p.is_emergency) return { cls: 'emerg', text: '⚠ Авария' };
+    if (p.direction === 'up')   return { cls: 'moving', text: 'В пути ↑ к ' + p.target_floor };
+    if (p.direction === 'down') return { cls: 'moving', text: 'В пути ↓ к ' + p.target_floor };
+    if (p.doors_open) return { cls: 'doors', text: 'Двери открыты · эт. ' + p.current_floor };
+    return { cls: '', text: 'Стоянка · эт. ' + p.current_floor };
+}
+
 function mPanelCard(p) {
     const total = p.total_floors || 9;
     const pos = mPanelCabinPos(p.current_floor, total);
     const cabinCls = ['lpc-cabin'];
     if (p.doors_open) cabinCls.push('doors-open');
     if (p.lights_on) cabinCls.push('lights-on');
+    if (p.direction !== 'idle') cabinCls.push('moving');
+    const arrowCls = p.direction === 'up' ? 'up' : (p.direction === 'down' ? 'down' : 'idle');
+    const si = mStatusInfo(p);
+    const cardCls = p.is_emergency ? 'lift-panel-card is-emergency' : 'lift-panel-card';
     let buttons = '';
     for (let f = 1; f <= total; f++) {
         const cls = f === p.current_floor ? 'current' : (f === p.target_floor && p.target_floor !== p.current_floor ? 'target' : '');
         buttons += `<button class="lpc-fbtn ${cls}" data-floor="${f}" onclick="mMoveTo(${p.lift_id},${f})">${f}</button>`;
     }
-    return `<div class="lift-panel-card" data-lift-id="${p.lift_id}">
-        <div class="lpc-head"><b>${p.model}</b>${bg(p.status)}</div>
+    return `<div class="${cardCls}" data-lift-id="${p.lift_id}">
+        <div class="lpc-head"><b>${p.model}</b><small style="color:var(--text-3);font-size:11px">#${String(p.lift_id).padStart(3,'0')}</small>${bg(p.status)}</div>
         <div class="lpc-row">
             <div class="lpc-shaft"><div class="${cabinCls.join(' ')}" style="bottom:${pos}%"></div></div>
             <div class="lpc-info">
                 <div class="lpc-led">
                     <span style="font-size:10px;color:var(--text-3);letter-spacing:0.1em">FLOOR</span>
                     <span class="lpc-led-num">${String(p.current_floor).padStart(2,'0')}</span>
+                    <span class="lpc-arrow ${arrowCls}"></span>
                 </div>
+                <div class="lpc-status ${si.cls}">${si.text}</div>
                 <div class="lpc-floors">${buttons}</div>
             </div>
         </div>
@@ -976,9 +1010,22 @@ async function mRefreshPanel() {
             cabin.style.bottom = pos + '%';
             cabin.classList.toggle('doors-open', !!p.doors_open);
             cabin.classList.toggle('lights-on', !!p.lights_on);
+            cabin.classList.toggle('moving', p.direction !== 'idle');
         }
         const led = card.querySelector('.lpc-led-num');
         if (led) led.textContent = String(p.current_floor).padStart(2,'0');
+        const arr = card.querySelector('.lpc-arrow');
+        if (arr) {
+            arr.classList.remove('up','down','idle');
+            arr.classList.add(p.direction === 'up' ? 'up' : (p.direction === 'down' ? 'down' : 'idle'));
+        }
+        const st = card.querySelector('.lpc-status');
+        if (st) {
+            const si = mStatusInfo(p);
+            st.className = 'lpc-status ' + si.cls;
+            st.textContent = si.text;
+        }
+        card.classList.toggle('is-emergency', !!p.is_emergency);
         card.querySelectorAll('.lpc-fbtn').forEach(btn => {
             const f = +btn.dataset.floor;
             btn.classList.toggle('current', f === p.current_floor);

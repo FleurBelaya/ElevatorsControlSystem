@@ -1470,7 +1470,7 @@ function buildSidebar(roles) {
         ).join('') +
         `<div class="sidebar-foot">
             <div class="status-pill"><span class="dot"></span>Канал API · ONLINE</div>
-            <div>Polling: <span class="mono">10s</span></div>
+            <div id="polling-label">Polling: <span class="mono">${currentSection === 'panel' ? '1s' : '10s'}</span></div>
         </div>`;
 }
 
@@ -1490,10 +1490,13 @@ function navigate(section) {
 // для пульта — мягкое in-place обновление каждую секунду (анимация кабины).
 function startAutoRefresh() {
     stopAutoRefresh();
+    const lbl = document.getElementById('polling-label');
     if (currentSection === 'panel') {
         autoRefreshTimer = setInterval(refreshPanel, 1000);
+        if (lbl) lbl.innerHTML = 'Polling: <span class="mono">1s</span>';
     } else {
         autoRefreshTimer = setInterval(() => navigate(currentSection), 10000);
+        if (lbl) lbl.innerHTML = 'Polling: <span class="mono">10s</span>';
     }
 }
 function stopAutoRefresh()  { if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; } }
@@ -1807,11 +1810,11 @@ async function loadSensors() {
                 <span class="ico">${NAV_ICONS.lifts}</span>
                 <span>Лифт <span class="ico-num">#${String(l.id).padStart(3,'0')}</span> — ${l.model}</span>
             </div>`;
-            if (!sensors.length) { html += '<div class="panel" style="padding:14px;color:var(--text-3);font-size:13px">Нет датчиков</div>'; continue; }
             let addBtn = '';
             if (hasRole('administrator') || hasRole('dispatcher'))
                 addBtn = `<div style="margin-bottom:8px"><button class="btn btn-primary btn-sm" onclick="showAddSensor(${l.id})">+ Датчик</button></div>`;
             html += addBtn;
+            if (!sensors.length) { html += '<div class="panel" style="padding:14px;color:var(--text-3);font-size:13px">Нет датчиков</div>'; continue; }
             html += `<table><thead><tr><th>ID</th><th>Тип</th><th>Значение</th><th>Порог</th><th>Зона</th><th>Действия</th></tr></thead><tbody>`;
             for (const s of sensors) {
                 const ratio = s.current_value / s.threshold_norm;
@@ -1830,7 +1833,7 @@ async function loadSensors() {
 
 function showAddSensor(liftId) {
     openModal(`<h3>Добавить датчик (лифт #${liftId})</h3>
-        <label>Тип датчика</label><input id="m-stype" placeholder="temperature / door / overload">
+        <label>Тип датчика</label><select id="m-stype"><option value="temperature">temperature — Температура</option><option value="door">door — Датчик дверей</option><option value="overload">overload — Перегрузка</option><option value="vibration">vibration — Вибрация</option><option value="speed">speed — Скорость</option><option value="smoke">smoke — Дым</option></select>
         <label>Начальное значение</label><input id="m-sval" type="number" value="0">
         <label>Пороговое значение</label><input id="m-sthresh" type="number" value="50">
         <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="addSensor(${liftId})">Создать</button></div>`);
